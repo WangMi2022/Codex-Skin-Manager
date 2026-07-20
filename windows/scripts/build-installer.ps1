@@ -85,7 +85,7 @@ try {
   $engine = Join-Path $payloadRoot '.codex-dream-skin'
   Copy-ReleaseFiles -SourceRoot (Join-Path $windowsRoot 'assets') -DestinationRoot (Join-Path $engine 'assets') -Names @('renderer-inject.js')
   Copy-ReleaseFiles -SourceRoot (Join-Path $windowsRoot 'skins\rose-garden') -DestinationRoot (Join-Path $engine 'assets\builtin\rose-garden') -Names @('skin.json', 'dream-skin.css', 'art.png')
-  foreach ($skinId in @('violet-riviera', 'lilac-salon')) {
+  foreach ($skinId in @('coral-haze', 'violet-riviera', 'lilac-salon')) {
     Copy-ReleaseFiles -SourceRoot (Join-Path $windowsRoot "skins\$skinId") -DestinationRoot (Join-Path $engine "bundled-skins\$skinId") -Names @('skin.json', 'dream-skin.css', 'art.png', 'preview.png')
   }
   Copy-ReleaseFiles -SourceRoot (Join-Path $windowsRoot 'scripts') -DestinationRoot (Join-Path $engine 'scripts') -Names @(
@@ -138,7 +138,7 @@ try {
   if ($installedManagerTest.ExitCode -ne 0) { throw "Installed manager v1/v2 self-test failed with exit code $($installedManagerTest.ExitCode)" }
   $active = Get-Content -Raw -LiteralPath (Join-Path $testRoot 'active-skin.json') | ConvertFrom-Json
   if ($active.skinId -cne 'rose-garden') { throw 'Installer smoke test selected the wrong default skin.' }
-  foreach ($skinId in @('rose-garden', 'violet-riviera', 'lilac-salon')) {
+  foreach ($skinId in @('rose-garden', 'coral-haze', 'violet-riviera', 'lilac-salon')) {
     $manifestPath = Join-Path $testRoot "skin\$skinId\skin.json"
     if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw "Installer smoke test did not seed $skinId" }
   }
@@ -171,9 +171,9 @@ try {
   $preservedMarker = Join-Path $testRoot 'skin\imported-test\preserved.txt'
   [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($preservedMarker)) | Out-Null
   [System.IO.File]::WriteAllText($preservedMarker, 'preserve imported skin', $utf8NoBom)
-  $removedCoralMarker = Join-Path $testRoot 'skin\coral-haze\skin.json'
-  [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($removedCoralMarker)) | Out-Null
-  [System.IO.File]::WriteAllText($removedCoralMarker, '{"id":"coral-haze"}', $utf8NoBom)
+  $legacyCoralMarker = Join-Path $testRoot 'skin\coral-haze\skin.json'
+  [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($legacyCoralMarker)) | Out-Null
+  [System.IO.File]::WriteAllText($legacyCoralMarker, '{"id":"coral-haze"}', $utf8NoBom)
   $runtimeHolder = $null
   try {
     $runtimeHolder = Start-Process -FilePath $runtimeNode -ArgumentList @("`"$holderScript`"") -PassThru
@@ -202,7 +202,8 @@ try {
   $upgradeTest = Start-Process -FilePath $installerOutput `
     -ArgumentList @('--test-install-parent', $testParent, '--test-error-log', $testErrorLog) -PassThru -Wait
   if ($upgradeTest.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $preservedMarker -PathType Leaf) -or
-    (Test-Path -LiteralPath $removedCoralMarker)) {
+    -not (Test-Path -LiteralPath $legacyCoralMarker -PathType Leaf) -or
+    (Get-Content -Raw -LiteralPath $legacyCoralMarker) -notmatch '晨雾珊瑚') {
     $upgradeError = if (Test-Path -LiteralPath $testErrorLog -PathType Leaf) { Get-Content -Raw -LiteralPath $testErrorLog } else { '' }
     throw "Installer upgrade storage test failed with exit code $($upgradeTest.ExitCode): $upgradeError"
   }
@@ -238,5 +239,10 @@ try {
   Write-Host "SHA-256: $hash"
   Write-Host "Node.js: $NodeVersion ($expectedNodeHash)"
 } finally {
-  if (Test-Path -LiteralPath $temporaryRoot) { [System.IO.Directory]::Delete($temporaryRoot, $true) }
+  if (Test-Path -LiteralPath $temporaryRoot) {
+    Get-ChildItem -LiteralPath $temporaryRoot -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object {
+      try { $_.Attributes = $_.Attributes -band (-bnot [System.IO.FileAttributes]::ReadOnly) } catch { }
+    }
+    [System.IO.Directory]::Delete($temporaryRoot, $true)
+  }
 }

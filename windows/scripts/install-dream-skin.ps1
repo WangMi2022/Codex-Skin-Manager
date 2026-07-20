@@ -35,7 +35,7 @@ try {
   New-Item -ItemType Directory -Force -Path $StateRoot | Out-Null
   $SkinsRoot = Join-Path $StateRoot 'skins'
   $BuiltInSkinId = 'rose-garden'
-  $BundledSkinIds = @($BuiltInSkinId, 'violet-riviera', 'lilac-salon')
+  $BundledSkinIds = @($BuiltInSkinId, 'coral-haze', 'violet-riviera', 'lilac-salon')
   foreach ($skinId in $BundledSkinIds) {
     $sourceCandidates = @(
       (Join-Path $SkillRoot "skins\$skinId"),

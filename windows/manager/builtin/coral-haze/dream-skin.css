@@ -1265,3 +1265,32 @@ html.codex-dream-skin .dream-sparkles i::after {
     will-change: auto !important;
   }
 }
+/* Seam polish: remove hard red divider lines between sidebar and content. */
+html.codex-dream-skin aside.app-shell-left-panel {
+  border-color: transparent !important;
+  border-right-color: transparent !important;
+  box-shadow:
+    5px 0 22px rgba(75,52,53,.045),
+    inset -1px 0 rgba(255,255,255,.62) !important;
+}
+
+html.codex-dream-skin main.main-surface {
+  border-color: transparent !important;
+  border-left-color: transparent !important;
+  box-shadow:
+    inset 1px 0 rgba(255,255,255,.62),
+    inset 0 1px rgba(255,255,255,.88),
+    -8px 0 22px rgba(75,52,53,.035) !important;
+}
+
+html.codex-dream-skin main.main-surface > header.app-header-tint {
+  border-bottom-color: rgba(222,211,203,.34) !important;
+  box-shadow: inset 0 -1px rgba(255,255,255,.50) !important;
+}
+
+html.codex-dream-skin aside.app-shell-left-panel [class~="bg-token-list-hover-background"],
+html.codex-dream-skin aside.app-shell-left-panel [aria-current="page"] {
+  border-color: rgba(210,176,164,.20) !important;
+  box-shadow: 0 4px 14px rgba(75,52,53,.07) !important;
+}
+

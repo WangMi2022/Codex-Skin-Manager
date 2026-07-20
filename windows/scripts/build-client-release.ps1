@@ -74,7 +74,7 @@ try {
   Copy-ReleaseFiles -SourceRoot $builtInSourceRoot -DestinationRoot (Join-Path $engineRoot 'assets\builtin\rose-garden') -Names @(
     'skin.json', 'dream-skin.css', 'art.png'
   )
-  foreach ($skinId in @('violet-riviera', 'lilac-salon')) {
+  foreach ($skinId in @('coral-haze', 'violet-riviera', 'lilac-salon')) {
     Copy-ReleaseFiles -SourceRoot (Join-Path $windowsRoot "skins\$skinId") -DestinationRoot (Join-Path $engineRoot "bundled-skins\$skinId") -Names @(
       'skin.json', 'dream-skin.css', 'art.png', 'preview.png'
     )

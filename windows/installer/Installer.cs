@@ -30,7 +30,7 @@ namespace CodexDreamSkinInstaller
     public const string InstallFolderName = "codex-skin-manager";
     public const string PayloadResource = "CodexDreamSkin.Payload.zip";
     public const string LogoResource = "CodexDreamSkin.Logo.png";
-    public static readonly string[] BundledSkinIds = new[] { "rose-garden", "violet-riviera", "lilac-salon" };
+    public static readonly string[] BundledSkinIds = new[] { "rose-garden", "coral-haze", "violet-riviera", "lilac-salon" };
 
     public static string DefaultInstallParent()
     {
@@ -204,7 +204,7 @@ namespace CodexDreamSkinInstaller
         stage = null;
         installedNew = true;
 
-        report("准备三款皮肤", 65);
+        report("准备四款皮肤", 65);
         SeedBundledSkins();
         if (!testMode) RegisterUninstall();
         if (!testMode) CreateShortcuts();
@@ -300,6 +300,7 @@ namespace CodexDreamSkinInstaller
         Path.Combine(engine, "assets", "builtin", "rose-garden", "skin.json"),
         Path.Combine(engine, "assets", "builtin", "rose-garden", "dream-skin.css"),
         Path.Combine(engine, "assets", "builtin", "rose-garden", "art.png"),
+        Path.Combine(engine, "bundled-skins", "coral-haze", "skin.json"),
         Path.Combine(engine, "bundled-skins", "violet-riviera", "skin.json"),
         Path.Combine(engine, "bundled-skins", "lilac-salon", "skin.json"),
         Path.Combine(engine, "scripts", "start-dream-skin.ps1"),
@@ -466,7 +467,7 @@ namespace CodexDreamSkinInstaller
       header.Controls.Add(logo);
       Label eyebrow = new Label { AutoSize = true, Text = "WINDOWS 皮肤安装向导", Font = new Font("Microsoft YaHei UI", 8.5F, FontStyle.Bold), ForeColor = DreamInstallerPalette.CoralDark, BackColor = Color.Transparent, Location = new Point(116, 17) };
       Label title = new Label { AutoSize = true, Text = InstallerConstants.ProductName, Font = new Font("Microsoft YaHei UI", 23F, FontStyle.Bold), ForeColor = DreamInstallerPalette.Ink, BackColor = Color.Transparent, Location = new Point(116, 35) };
-      Label subtitle = new Label { AutoSize = true, Text = "默认安装到 E:\\codex-skin-manager · 三款人像皮肤 · 星光动态层", Font = new Font("Microsoft YaHei UI", 10F), ForeColor = DreamInstallerPalette.Muted, BackColor = Color.Transparent, Location = new Point(120, 82) };
+      Label subtitle = new Label { AutoSize = true, Text = "默认安装到 E:\\codex-skin-manager · 四款人像皮肤 · 星光动态层", Font = new Font("Microsoft YaHei UI", 10F), ForeColor = DreamInstallerPalette.Muted, BackColor = Color.Transparent, Location = new Point(120, 82) };
       DreamPill versionPill = new DreamPill { Text = "v" + InstallerConstants.Version, Location = new Point(620, 30), Size = new Size(66, 28) };
       header.Controls.Add(eyebrow);
       header.Controls.Add(title); header.Controls.Add(subtitle); Controls.Add(header);
@@ -486,6 +487,7 @@ namespace CodexDreamSkinInstaller
       ListView skins = new ListView { Location = new Point(34, 282), Size = new Size(652, 118), View = View.Details, FullRowSelect = true, HeaderStyle = ColumnHeaderStyle.None, BorderStyle = BorderStyle.FixedSingle, BackColor = Color.FromArgb(255, 253, 250), ForeColor = DreamInstallerPalette.Ink, Font = new Font("Microsoft YaHei UI", 9.5F) };
       skins.Columns.Add("皮肤", 185); skins.Columns.Add("说明", 452);
       skins.Items.Add(new ListViewItem(new[] { "玫瑰轻纱", "樱粉玫瑰、人像柔光与蝴蝶星芒" }));
+      skins.Items.Add(new ListViewItem(new[] { "晨雾珊瑚", "暖色人像、柔和晨雾与珊瑚光感" }));
       skins.Items.Add(new ListViewItem(new[] { "哈基米", "紫色人像、星蝶光环与宇宙舞台" }));
       skins.Items.Add(new ListViewItem(new[] { "紫纱晴光", "紫纱人像、香槟沙发与室内晴光" }));
       Controls.Add(skins);
@@ -536,7 +538,7 @@ namespace CodexDreamSkinInstaller
         InstallEngine engine = new InstallEngine(installRoot, false,
           delegate(string message, int value) { status.Text = message; progress.Value = value; Application.DoEvents(); });
         engine.Install();
-        string completionMessage = "安装完成。三款皮肤已准备好，打开管理器即可预览和应用。";
+        string completionMessage = "安装完成。四款皮肤已准备好，打开管理器即可预览和应用。";
         MessageBoxIcon icon = MessageBoxIcon.Information;
         if (!string.IsNullOrEmpty(engine.CleanupWarning))
         {

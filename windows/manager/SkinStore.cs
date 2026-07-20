@@ -53,7 +53,7 @@ namespace CodexDreamSkinManager
   public sealed class SkinStore
   {
     public const string BuiltInSkinId = "rose-garden";
-    public static readonly string[] BundledSkinIds = new string[] { "rose-garden", "violet-riviera", "lilac-salon" };
+    public static readonly string[] BundledSkinIds = new string[] { "rose-garden", "coral-haze", "violet-riviera", "lilac-salon" };
     private const int MaxCssBytes = 2 * 1024 * 1024;
     private const int MaxArtBytes = 20 * 1024 * 1024;
     private const int MaxPreviewBytes = 20 * 1024 * 1024;

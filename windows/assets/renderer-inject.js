@@ -6,6 +6,7 @@
   const WINDOWS_MENU_REGION_ATTR = "data-dream-menu-region";
   const ATTACHED_MAIN_CLASS = "dream-shell-attached-main";
   const ATTACHED_SIDEBAR_CLASS = "dream-shell-attached-sidebar";
+  const SHELL_SEAM_CLASS = "dream-shell-seam";
   window.__CODEX_DREAM_SKIN_DISABLED__ = false;
 
   const previous = window[STATE_KEY];
@@ -62,6 +63,30 @@ html.codex-dream-skin .dream-windows-menu-bar [data-dream-menu-region="main"] {
   color: var(--dream-windows-main-foreground) !important;
   -webkit-text-fill-color: var(--dream-windows-main-foreground) !important;
 }
+html.codex-dream-skin .dream-windows-menu-bar::after {
+  content: "";
+  position: absolute;
+  z-index: 20;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--dream-windows-seam-x, -100px) - 5px);
+  width: 12px;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(250, 247, 239, .94) 0%,
+      rgba(250, 247, 239, .78) 44%,
+      rgba(250, 247, 239, .34) 72%,
+      rgba(250, 247, 239, 0) 100%
+    ) !important;
+}
+html.codex-dream-skin .dream-windows-menu-bar + * > [role="separator"],
+html.codex-dream-skin .dream-windows-menu-bar + * > [data-panel-resize-handle-id] {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
 html.codex-dream-skin aside.app-shell-left-panel.dream-shell-attached-main {
   border-top-right-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
@@ -71,6 +96,30 @@ html.codex-dream-skin main.main-surface.dream-shell-attached-sidebar > header.ap
 html.codex-dream-skin #codex-dream-skin-chrome.dream-shell-attached-sidebar {
   border-top-left-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
+}
+html.codex-dream-skin #codex-dream-skin-chrome .dream-shell-seam {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  pointer-events: none;
+  opacity: .96;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(250, 247, 239, .96) 0%,
+      rgba(250, 247, 239, .76) 40%,
+      rgba(250, 247, 239, .38) 68%,
+      rgba(250, 247, 239, 0) 100%
+    ) !important;
+  box-shadow:
+    4px 0 14px rgba(250, 247, 239, .52),
+    -1px 0 rgba(255, 255, 255, .62);
+}
+html.codex-dream-skin #codex-dream-skin-chrome:not(.dream-shell-attached-sidebar) .dream-shell-seam {
+  display: none;
 }
 `;
   const runtimeCssText = `${cssText}\n${effectCssText}`;
@@ -117,7 +166,7 @@ html.codex-dream-skin #codex-dream-skin-chrome.dream-shell-attached-sidebar {
       for (const name of [
         "--dream-windows-menu-height", "--dream-windows-sidebar-padding-top",
         "--dream-windows-main-padding-top", "--dream-windows-sidebar-foreground",
-        "--dream-windows-main-foreground",
+        "--dream-windows-main-foreground", "--dream-windows-seam-x",
       ]) root?.style.removeProperty(name);
       return false;
     }
@@ -136,6 +185,7 @@ html.codex-dream-skin #codex-dream-skin-chrome.dream-shell-attached-sidebar {
 
     const sidebarBox = sidebar.getBoundingClientRect();
     const mainBox = main.getBoundingClientRect();
+    setRootVar("--dream-windows-seam-x", `${Math.round(sidebarBox.right - menuBox.left)}px`);
     const attached = sidebarBox.width > 1 && mainBox.width > 1 &&
       Math.abs(sidebarBox.right - mainBox.left) <= 2 &&
       Math.abs(sidebarBox.top - mainBox.top) <= 2;
@@ -207,12 +257,16 @@ html.codex-dream-skin #codex-dream-skin-chrome.dream-shell-attached-sidebar {
       chrome.id = CHROME_ID;
       chrome.setAttribute("aria-hidden", "true");
       chrome.innerHTML = `
+        <div class="dream-shell-seam"></div>
         <div class="dream-brand"><span class="dream-note">✦</span><span><b></b><small></small></span></div>
         <div class="dream-signature"></div>
         <div class="dream-sparkles"><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="dream-ribbon"><span>♡</span>✦<span>♡</span></div>
         <div class="dream-polaroid"></div>`;
       document.body.appendChild(chrome);
+    }
+    if (!chrome.querySelector(`.${SHELL_SEAM_CLASS}`)) {
+      chrome.insertAdjacentHTML("afterbegin", `<div class="${SHELL_SEAM_CLASS}"></div>`);
     }
     chrome.querySelector(".dream-brand b").textContent = meta.brandName;
     chrome.querySelector(".dream-brand small").textContent = meta.brandSubtitle;
@@ -244,7 +298,7 @@ html.codex-dream-skin #codex-dream-skin-chrome.dream-shell-attached-sidebar {
     for (const name of [
       "--dream-windows-menu-height", "--dream-windows-sidebar-padding-top",
       "--dream-windows-main-padding-top", "--dream-windows-sidebar-foreground",
-      "--dream-windows-main-foreground",
+      "--dream-windows-main-foreground", "--dream-windows-seam-x",
     ]) document.documentElement?.style.removeProperty(name);
     document.getElementById(STYLE_ID)?.remove();
     document.getElementById(CHROME_ID)?.remove();

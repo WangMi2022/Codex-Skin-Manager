@@ -313,7 +313,7 @@ namespace CodexDreamSkinManager
     {
       Panel content = new Panel { Dock = DockStyle.Fill, Padding = new Padding(28, 24, 28, 18), BackColor = Canvas };
 
-      PreviewHost previewHost = new PreviewHost { Dock = DockStyle.Top, Height = 316, BackColor = Surface, Padding = new Padding(2) };
+      PreviewHost previewHost = new PreviewHost { Dock = DockStyle.Top, Height = 316, BackColor = Surface, Padding = new Padding(7) };
       preview = new PictureBox { Dock = DockStyle.Fill, BackColor = Color.FromArgb(239, 234, 228), SizeMode = PictureBoxSizeMode.Zoom };
       PillLabel previewTag = new PillLabel
       {
@@ -1128,29 +1128,40 @@ namespace CodexDreamSkinManager
       try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
       Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Regular, GraphicsUnit.Point);
       StartPosition = FormStartPosition.CenterParent;
-      FormBorderStyle = FormBorderStyle.FixedDialog;
+      FormBorderStyle = FormBorderStyle.None;
       ShowInTaskbar = false;
       MaximizeBox = false;
       MinimizeBox = false;
       BackColor = Canvas;
       AutoScaleMode = AutoScaleMode.Dpi;
+      Padding = new Padding(1);
       int bodyHeight = Math.Max(82, Math.Min(190, TextRenderer.MeasureText(message, Font, new Size(396, 0),
         TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl).Height + 8));
-      ClientSize = new Size(536, bodyHeight + 174);
+      ClientSize = new Size(556, bodyHeight + 184);
+      Region = new Region(UiGeometry.Rounded(new Rectangle(0, 0, ClientSize.Width, ClientSize.Height), 22));
 
       DreamDialogBackdrop backdrop = new DreamDialogBackdrop { Dock = DockStyle.Fill };
       Controls.Add(backdrop);
       RoundedPanel card = new RoundedPanel
       {
-        Location = new Point(18, 18),
+        Location = new Point(20, 20),
         Size = new Size(ClientSize.Width - 36, ClientSize.Height - 36),
-        Radius = 24,
+        Radius = 28,
         BackColor = Surface,
         BorderColor = Border
       };
       backdrop.Controls.Add(card);
 
-      DreamMessageGlyph glyph = new DreamMessageGlyph(icon) { Location = new Point(24, 25), Size = new Size(58, 58) };
+      DreamDialogCloseButton closeButton = new DreamDialogCloseButton
+      {
+        Location = new Point(card.Width - 47, 16),
+        Size = new Size(30, 30),
+        AccessibleName = "关闭弹窗"
+      };
+      closeButton.Click += delegate { DialogResult = DialogResult.Cancel; Close(); };
+      card.Controls.Add(closeButton);
+
+      DreamMessageGlyph glyph = new DreamMessageGlyph(icon) { Location = new Point(26, 27), Size = new Size(60, 60) };
       Label titleLabel = new Label
       {
         AutoSize = false,
@@ -1158,8 +1169,8 @@ namespace CodexDreamSkinManager
         Font = new Font("Microsoft YaHei UI", 15F, FontStyle.Bold),
         ForeColor = Ink,
         BackColor = Color.Transparent,
-        Location = new Point(96, 26),
-        Size = new Size(384, 32)
+        Location = new Point(100, 29),
+        Size = new Size(356, 32)
       };
       Label body = new Label
       {
@@ -1168,23 +1179,23 @@ namespace CodexDreamSkinManager
         Font = new Font("Microsoft YaHei UI", 9.4F),
         ForeColor = Muted,
         BackColor = Color.Transparent,
-        Location = new Point(98, 65),
-        Size = new Size(384, bodyHeight)
+        Location = new Point(102, 69),
+        Size = new Size(382, bodyHeight)
       };
       card.Controls.Add(glyph);
       card.Controls.Add(titleLabel);
       card.Controls.Add(body);
-      AddButtons(card, buttons, defaultButton, bodyHeight + 92);
+      AddButtons(card, buttons, defaultButton, bodyHeight + 98);
     }
 
     private void AddButtons(Control card, MessageBoxButtons buttons, MessageBoxDefaultButton defaultButton, int top)
     {
       if (buttons == MessageBoxButtons.YesNo)
       {
-        DreamButton no = CreateDialogButton("取消", DialogResult.No, false, false, new Point(card.Width - 214, top));
-        DreamButton yes = CreateDialogButton("继续", DialogResult.Yes, true, false, new Point(card.Width - 114, top));
-        card.Controls.Add(no);
+        DreamButton yes = CreateDialogButton("继续", DialogResult.Yes, true, false, new Point(card.Width - 214, top));
+        DreamButton no = CreateDialogButton("取消", DialogResult.No, false, false, new Point(card.Width - 114, top));
         card.Controls.Add(yes);
+        card.Controls.Add(no);
         AcceptButton = defaultButton == MessageBoxDefaultButton.Button2 ? no : yes;
         CancelButton = no;
         return;
@@ -1228,6 +1239,72 @@ namespace CodexDreamSkinManager
         }
         using (var warm = new SolidBrush(Color.FromArgb(54, Coral))) args.Graphics.FillEllipse(warm, Width - 280, -110, 300, 230);
         using (var cool = new SolidBrush(Color.FromArgb(38, Teal))) args.Graphics.FillEllipse(cool, Width - 120, 40, 190, 160);
+      }
+
+      protected override void OnPaint(PaintEventArgs args)
+      {
+        base.OnPaint(args);
+        args.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        Rectangle bounds = new Rectangle(0, 0, Width - 1, Height - 1);
+        using (GraphicsPath path = UiGeometry.Rounded(bounds, 22))
+        using (var pen = new Pen(Color.FromArgb(232, 202, 191), 1.4F))
+          args.Graphics.DrawPath(pen, path);
+      }
+    }
+
+    private sealed class DreamDialogCloseButton : Control
+    {
+      private bool hovered;
+      private bool pressed;
+
+      public DreamDialogCloseButton()
+      {
+        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
+          ControlStyles.UserPaint | ControlStyles.SupportsTransparentBackColor, true);
+        BackColor = Color.Transparent;
+        Cursor = Cursors.Hand;
+      }
+
+      protected override void OnMouseEnter(EventArgs eventArgs) { hovered = true; Invalidate(); base.OnMouseEnter(eventArgs); }
+      protected override void OnMouseLeave(EventArgs eventArgs) { hovered = false; pressed = false; Invalidate(); base.OnMouseLeave(eventArgs); }
+      protected override void OnMouseDown(MouseEventArgs eventArgs) { pressed = true; Invalidate(); base.OnMouseDown(eventArgs); }
+      protected override void OnMouseUp(MouseEventArgs eventArgs) { pressed = false; Invalidate(); base.OnMouseUp(eventArgs); }
+
+      protected override void OnPaintBackground(PaintEventArgs args)
+      {
+        int offsetX;
+        int offsetY;
+        Control ancestor = UiGeometry.BackgroundAncestor(this, out offsetX, out offsetY);
+        if (ancestor == null)
+        {
+          args.Graphics.Clear(Canvas);
+          return;
+        }
+        GraphicsState state = args.Graphics.Save();
+        try
+        {
+          args.Graphics.TranslateTransform(-offsetX, -offsetY);
+          using (var parentArgs = new PaintEventArgs(args.Graphics, new Rectangle(offsetX, offsetY, Width, Height)))
+            InvokePaintBackground(ancestor, parentArgs);
+        }
+        finally { args.Graphics.Restore(state); }
+      }
+
+      protected override void OnPaint(PaintEventArgs args)
+      {
+        OnPaintBackground(args);
+        args.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        Color fill = pressed ? Color.FromArgb(242, 221, 214) : hovered ? Color.FromArgb(249, 235, 229) : Color.FromArgb(0, 255, 255, 255);
+        if (fill.A > 0)
+        {
+          using (GraphicsPath path = UiGeometry.Rounded(new Rectangle(1, 1, Width - 3, Height - 3), 10))
+          using (var brush = new SolidBrush(fill)) args.Graphics.FillPath(brush, path);
+        }
+        using (var pen = new Pen(hovered ? Coral : Muted, 1.8F))
+        {
+          args.Graphics.DrawLine(pen, 10, 10, Width - 10, Height - 10);
+          args.Graphics.DrawLine(pen, Width - 10, 10, 10, Height - 10);
+        }
       }
     }
 
@@ -1661,3 +1738,4 @@ namespace CodexDreamSkinManager
     }
   }
 }
+
