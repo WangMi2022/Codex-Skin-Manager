@@ -4,6 +4,7 @@ param(
   [switch]$RestartExisting,
   [switch]$PromptRestart,
   [string]$ProfilePath,
+  [string]$SkinStateRoot,
   [switch]$ForegroundInjector
 )
 
@@ -15,6 +16,11 @@ $Injector = Join-Path $PSScriptRoot 'injector.mjs'
 $operationLock = Enter-DreamSkinOperationLock
 try {
   Assert-DreamSkinPort -Port $Port
+  if ($SkinStateRoot) {
+    $SkinStateRoot = [System.IO.Path]::GetFullPath($SkinStateRoot)
+    New-Item -ItemType Directory -Force -Path $SkinStateRoot | Out-Null
+    $env:CODEX_DREAM_SKIN_STATE_ROOT = $SkinStateRoot
+  }
   if ($ProfilePath) { $ProfilePath = [System.IO.Path]::GetFullPath($ProfilePath) }
   $node = Get-DreamSkinNodeRuntime
   $currentCodex = Get-DreamSkinCodexInstall
@@ -194,12 +200,13 @@ try {
       codexVersion = $codex.Version
       browserId = $cdpIdentity.BrowserId
       profilePath = $ProfilePath
+      skinStateRoot = $SkinStateRoot
       createdAt = (Get-Date).ToUniversalTime().ToString('o')
     }
     Write-DreamSkinState -Path $StatePath -State $state
 
     $verifyOutput = @(& $node.Path $Injector --verify --port $Port --browser-id $cdpIdentity.BrowserId `
-      --timeout-ms 30000 2>&1)
+      --timeout-ms 60000 2>&1)
     $verifyExitCode = $LASTEXITCODE
     Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content (($verifyOutput -join "`r`n") + "`r`n")
     if ($verifyExitCode -ne 0) { throw "Dream Skin verification failed. See $VerifyPath" }

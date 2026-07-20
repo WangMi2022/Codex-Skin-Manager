@@ -29,6 +29,8 @@ Apply a reversible renderer skin through Chromium DevTools Protocol while launch
 - Loopback prevents LAN exposure, but Chromium CDP has no same-user authentication. Run only trusted local software while the skin is active, and use restore to close the debug session when it is no longer needed.
 - Preserve `config.toml` as strict UTF-8. Never use encoding-dependent whole-file PowerShell reads/writes, silently transcode UTF-16, or overwrite a file that changed after it was read. Ambiguous TOML shapes must fail before writing rather than receive a best-effort rewrite.
 - Keep install/start/restore/verify serialized with the per-user operation lock in `common-windows.ps1`.
+- Treat `skins/rose-garden/` as the immutable source for the built-in skin. The bundled companion themes are `skins/violet-riviera/` and `skins/lilac-salon/`. New themes must use a distinct skin ID. The installed manager stores imported themes under its selected `codex-skin-manager\skin` directory and migrates missing themes from the legacy `%LOCALAPPDATA%\CodexDreamSkin\skins` directory; never overwrite bundled manifests, CSS, or artwork while packaging another theme. Release builds copy the built-in source into `assets/builtin/rose-garden/` and the companion themes into `bundled-skins/` inside the package.
+- The manager supports both the native Dream Skin schema v1 (`skin.json`, `dream-skin.css`, `art.png`) and Awesome Codex Skins schema v2 (`theme.json`, `theme.css`, `chrome.html`, `assets/`). Keep the two renderer runtimes isolated. Schema v2 code vendored under `scripts/theme-v2/` retains its upstream MIT license; `runtime/webp/dwebp.exe` is the pinned official libwebp decoder used only to create local manager previews.
 
 ## Checks
 
@@ -43,7 +45,7 @@ node --check assets\renderer-inject.js
 - `scripts/injector.mjs`: CDP connection, renderer injection, verification, screenshot, and removal.
 - `scripts/common-windows.ps1`: Store-package discovery, Node validation, port ownership, state, and process identity safety.
 - `scripts/config-utf8.ps1`: atomic UTF-8 configuration backup, selective restore, and explicit recovery.
-- `assets/dream-skin.css`: full visual layer.
+- `skins/rose-garden/`: isolated source manifest, visual layer, and artwork for the built-in Rose Garden skin.
 - `assets/renderer-inject.js`: idempotent DOM integration and cleanup.
 - `assets/dream-reference.png`: user-provided visual reference used only in cropped decorative regions.
 - `references/qa-inventory.md`: required functional and visual signoff coverage.

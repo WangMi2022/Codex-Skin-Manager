@@ -1,0 +1,33 @@
+Codex Dream Skin 皮肤包格式（schemaVersion 1）
+
+最简单的制作方式：
+1. 打开“Codex皮肤主题管理器.exe”。
+2. 选择现有皮肤并点击“导出皮肤包”。
+3. 将导出的 .codexskin 当作 ZIP 解压并修改文件。
+4. 保持以下文件位于压缩包根目录，再压缩并改名为 .codexskin。
+
+必需文件：
+- skin.json：皮肤名称、ID、作者和显示文案。
+- dream-skin.css：Codex 外观样式，必须是 UTF-8，最大 2 MB。
+- art.png：主背景图片，必须是 PNG，最大 20 MB。
+
+可选文件：
+- preview.png：管理器预览图；未提供时使用 art.png。
+
+skin.json 示例：
+{
+  "schemaVersion": 1,
+  "id": "my-skin",
+  "name": "我的皮肤",
+  "version": "1.0.0",
+  "author": "你的名字",
+  "description": "皮肤简介",
+  "brandName": "我的 Codex 皮肤",
+  "brandSubtitle": "Codex Dream Skin",
+  "signature": "My Skin"
+}
+
+安全限制：
+- id 只能使用小写英文字母、数字、点、横线和下划线，最长 64 个字符。
+- CSS 不允许 @import、http/https URL、javascript: 或 data:text/html。
+- 皮肤包不允许包含 .. 或绝对路径。

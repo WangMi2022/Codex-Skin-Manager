@@ -131,9 +131,13 @@ try {
       $desktop = [Environment]::GetFolderPath('Desktop')
       $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
       @(
+        (Join-Path $desktop 'Codex皮肤主题管理器.lnk'),
+        (Join-Path $startMenu 'Codex皮肤主题管理器.lnk'),
         (Join-Path $desktop 'Codex Dream Skin.lnk'),
         (Join-Path $desktop 'Codex Dream Skin - Restore.lnk'),
-        (Join-Path $startMenu 'Codex Dream Skin.lnk')
+        (Join-Path $desktop 'Codex Dream Skin Manager.lnk'),
+        (Join-Path $startMenu 'Codex Dream Skin.lnk'),
+        (Join-Path $startMenu 'Codex Dream Skin Manager.lnk')
       ) | ForEach-Object { Remove-Item -LiteralPath $_ -Force -ErrorAction SilentlyContinue }
     }
 

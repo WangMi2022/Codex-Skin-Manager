@@ -6,5 +6,11 @@
 .vscode/
 README.preview.html
 docs/readme-preview.html
+.codex_tmp/
+tmp/
+output/
 release/
 runtime/
+windows/manager/bin/
+windows/scripts/__pycache__/
+windows/scripts/generate-image2.env

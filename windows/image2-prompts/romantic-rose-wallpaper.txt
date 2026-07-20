@@ -1,0 +1,30 @@
+Use case: photorealistic-natural
+Asset type: adaptive Codex desktop wallpaper
+Primary request: Create one new standalone 2560x1440, 16:9 desktop wallpaper as edge-to-edge continuous artwork. Generate only the underlying romantic rose scene that will sit beneath a real application interface.
+
+Input image contract:
+- Image 1 is a UI screenshot or concept mockup. Use it only for palette, lighting, atmosphere, subject placement, and broad composition. It is not an edit target.
+- Image 2, if supplied, is a clean style or environment reference. Use it only for materials, floral language, color grading, depth of field, and lighting. Do not infer identity, copy text, or copy branded elements from it.
+- Identity mode for this prompt is ORIGINAL FICTIONAL ADULT. Do not attach or use Image 3. Do not infer a real identity from Image 1 or Image 2. For an identity-preserving result, stop and use the separately authorized workflow below.
+
+Reference handling: Generate a completely new image from scratch. Do not copy, trace, clean up, erase UI from, or retain any interface element from the references. Reconstruct all areas hidden by Image 1's interface as one continuous natural environment.
+
+Scene/backdrop: A luxurious pastel rose-garden studio with pink and ivory rose clusters concentrated around the right side, translucent blush curtains, soft-focus floral depth, sparse floating petals, pearlescent dust, tiny warm star-like glints, and restrained creamy bokeh. Continue the same environment naturally across the entire canvas. Keep x=0%-52% calm, bright, low-contrast, and low-detail with a smooth warm-ivory-to-blush atmosphere, extremely faint watercolor leaves, and only a few sparse petals. Keep the bottom-left and center-left especially quiet.
+
+Subject: One original fictional adult woman in a refined romantic beauty-editorial portrait. She is clearly adult and is not based on any named or recognizable person. Give her balanced delicate facial proportions, expressive eyes, long glossy black twin ponytails, airy bangs, soft natural pink makeup, and a gentle confident expression. She wears delicate white fluffy hair ornaments, a blush-pink chiffon dress with translucent ruffled sleeves, subtle crystal embroidery, and a small white faux-fur shoulder wrap. Her hands form one natural relaxed pose near her collarbone.
+
+Style/medium: Premium Japanese romantic beauty editorial, polished photorealism, realistic skin texture, natural anatomy, delicate fabric micro-detail, shallow depth of field, no plastic CGI skin.
+
+Capture context: Eye-level editorial portrait with a restrained 85 mm lens feel and a natural waist-up three-quarter framing; realistic optical depth and no extreme wide-angle distortion.
+
+Composition/framing: Reserve x=0%-52% for the calm text-safe environment. Keep the complete critical silhouette, face, hands, hair ornaments, and clothing details within x=62%-88% and y=16%-72%. Place the face within y=20%-52% and the hands within y=30%-70%. Keep nonessential flowers and curtain detail within x=56%-90%. Keep all critical details at least 8% away from every edge. Create one continuous scene with no vertical seam or split-panel effect.
+
+Materials/detail: Real rose petals with varied translucency, matte chiffon, soft faux-fur fibers, restrained crystal highlights, translucent curtain weave, and natural skin micro-texture. Keep reflective sparkle sparse and physically coherent.
+
+Lighting/mood: High-key diffused beauty lighting, soft window glow from the upper left, gentle rim light around dark hair, calm romantic atmosphere.
+
+Color palette: Warm ivory, pearl white, sakura pink, dusty rose, with restrained muted-berry accents and enough midtone detail to survive both light and dark translucent overlays.
+
+Constraints: Pure wallpaper only. No readable text and no interface. One adult person only, natural hands, coherent perspective, continuous edge-to-edge background.
+
+Avoid: screenshot, UI, UX, GUI, software window, browser, mockup, title bar, menu bar, sidebar, navigation, dashboard, panel, card, rounded rectangle, button, icon, badge, input box, composer, chat panel, code panel, terminal, cursor, device frame, poster layout, typography, letters, words, Chinese text, numbers, name, signature, logo, label, watermark, border, split screen, collage, polaroid, blank white panel, celebrity likeness, public figure likeness, private-person likeness, copyrighted character, child, underage appearance, duplicate person, duplicate face, extra limbs, extra hands, extra fingers, malformed hands, cropped face, cropped hands.

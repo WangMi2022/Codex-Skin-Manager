@@ -1,4 +1,5 @@
 . (Join-Path $PSScriptRoot 'config-utf8.ps1')
+$script:DreamSkinScriptsRoot = $PSScriptRoot
 
 function Enter-DreamSkinOperationLock {
   $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
@@ -48,6 +49,59 @@ function Test-DreamSkinPathWithin {
   }
 }
 
+function New-DreamSkinShortcut {
+  param(
+    [Parameter(Mandatory = $true)][object]$Shell,
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$TargetPath,
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Arguments,
+    [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+    [Parameter(Mandatory = $true)][string]$Description
+  )
+
+  $fullPath = [System.IO.Path]::GetFullPath($Path)
+  $fullTargetPath = [System.IO.Path]::GetFullPath($TargetPath)
+  $fullWorkingDirectory = [System.IO.Path]::GetFullPath($WorkingDirectory)
+  if ([System.IO.Path]::GetExtension($fullPath) -ine '.lnk') {
+    throw "Shortcut path must end in .lnk: $fullPath"
+  }
+  if (-not (Test-Path -LiteralPath $fullTargetPath -PathType Leaf)) {
+    throw "Shortcut target does not exist: $fullTargetPath"
+  }
+  if (-not (Test-Path -LiteralPath $fullWorkingDirectory -PathType Container)) {
+    throw "Shortcut working directory does not exist: $fullWorkingDirectory"
+  }
+
+  # Reusing CreateShortcut on an existing .lnk can preserve stale Shell Link metadata.
+  Remove-Item -LiteralPath $fullPath -Force -ErrorAction SilentlyContinue
+  if (Test-Path -LiteralPath $fullPath) {
+    throw "Existing shortcut could not be removed: $fullPath"
+  }
+  $shortcut = $Shell.CreateShortcut($fullPath)
+  $shortcut.TargetPath = $fullTargetPath
+  $shortcut.Arguments = $Arguments
+  $shortcut.WorkingDirectory = $fullWorkingDirectory
+  $shortcut.Description = $Description
+  $shortcut.Save()
+  if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+    throw "Shortcut was not created: $fullPath"
+  }
+  return $fullPath
+}
+
+function Get-DreamSkinPowerShellHostPath {
+  $process = Get-Process -Id $PID -ErrorAction Stop
+  $hostPath = "$($process.Path)"
+  if (-not $hostPath -or -not (Test-Path -LiteralPath $hostPath -PathType Leaf)) {
+    throw 'The current PowerShell host executable could not be resolved.'
+  }
+  $hostName = [System.IO.Path]::GetFileName($hostPath)
+  if ($hostName -ine 'pwsh.exe' -and $hostName -ine 'powershell.exe') {
+    throw "Unsupported PowerShell host executable: $hostPath"
+  }
+  return [System.IO.Path]::GetFullPath($hostPath)
+}
+
 function Test-DreamSkinCommandLineToken {
   param([string]$CommandLine, [string]$Token)
   if (-not $CommandLine -or -not $Token) { return $false }
@@ -78,12 +132,21 @@ function Get-DreamSkinProcessExecutablePath {
 function Get-DreamSkinNodeRuntime {
   param([int]$MinimumMajor = 22)
 
-  $command = Get-Command node.exe -ErrorAction SilentlyContinue
-  if (-not $command) { $command = Get-Command node -ErrorAction SilentlyContinue }
-  if (-not $command) { throw "Node.js $MinimumMajor or newer is required and was not found in PATH." }
-  $version = "$(& $command.Source -p 'process.versions.node' 2>$null)".Trim()
+  $skillRoot = Split-Path -Parent $script:DreamSkinScriptsRoot
+  $bundledNode = Join-Path $skillRoot 'runtime\node\node.exe'
+  $runtimeCommand = if (Test-Path -LiteralPath $bundledNode) {
+    [System.IO.Path]::GetFullPath($bundledNode)
+  } else {
+    $command = Get-Command node.exe -ErrorAction SilentlyContinue
+    if (-not $command) { $command = Get-Command node -ErrorAction SilentlyContinue }
+    if ($command) { $command.Source } else { $null }
+  }
+  if (-not $runtimeCommand) {
+    throw "Node.js $MinimumMajor or newer is required and was not found in the bundled runtime or PATH."
+  }
+  $version = "$(& $runtimeCommand -p 'process.versions.node' 2>$null)".Trim()
   if ($LASTEXITCODE -ne 0 -or -not $version) { throw 'The Node.js runtime could not be validated.' }
-  $runtimePath = "$(& $command.Source -p 'process.execPath' 2>$null)".Trim()
+  $runtimePath = "$(& $runtimeCommand -p 'process.execPath' 2>$null)".Trim()
   if ($LASTEXITCODE -ne 0 -or -not $runtimePath -or -not (Test-Path -LiteralPath $runtimePath)) {
     throw 'The Node.js executable path could not be validated.'
   }

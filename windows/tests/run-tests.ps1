@@ -130,6 +130,9 @@ try {
   if (-not (Test-DreamSkinBytesEqual -Left $secondBaselineBytes -Right ([System.IO.File]::ReadAllBytes($backupPath)))) {
     throw 'Reinstall did not capture a fresh config baseline after completed restore.'
   }
+  if (@(Get-ChildItem -LiteralPath $temporaryRoot -Force -Filter '*.replace-backup').Count -ne 0) {
+    throw 'Atomic replacement left a temporary replacement backup behind.'
+  }
 
   $invalidPath = Join-Path $temporaryRoot 'invalid.toml'
   $invalidBackupPath = Join-Path $temporaryRoot 'invalid.before.toml'
@@ -309,11 +312,218 @@ try {
     throw 'Stale state was not preserved under an archive name.'
   }
 
+
+  $shortcutDirectory = Join-Path $temporaryRoot 'shortcut-test'
+  New-Item -ItemType Directory -Path $shortcutDirectory | Out-Null
+  $shortcutPath = Join-Path $shortcutDirectory 'Codex Dream Skin.lnk'
+  $shortcutShell = New-Object -ComObject WScript.Shell
+  $staleShortcut = $shortcutShell.CreateShortcut($shortcutPath)
+  $staleShortcut.TargetPath = $env:ComSpec
+  $staleShortcut.WorkingDirectory = $shortcutDirectory
+  $staleShortcut.Description = 'stale shortcut'
+  $staleShortcut.Save()
+  (Get-Item -LiteralPath $shortcutPath).IsReadOnly = $true
+  $shortcutArguments = '-NoProfile -ExecutionPolicy Bypass -File "C:\Dream Skin\start.ps1" -PromptRestart'
+  New-DreamSkinShortcut -Shell $shortcutShell -Path $shortcutPath -TargetPath $env:ComSpec `
+    -Arguments $shortcutArguments -WorkingDirectory $shortcutDirectory -Description 'fresh shortcut' | Out-Null
+  $freshShortcut = $shortcutShell.CreateShortcut($shortcutPath)
+  if (-not (Test-DreamSkinPathEqual -Left $freshShortcut.TargetPath -Right $env:ComSpec) -or
+    $freshShortcut.Arguments -cne $shortcutArguments -or
+    -not (Test-DreamSkinPathEqual -Left $freshShortcut.WorkingDirectory -Right $shortcutDirectory) -or
+    $freshShortcut.Description -cne 'fresh shortcut' -or
+    (Get-Item -LiteralPath $shortcutPath).IsReadOnly) {
+    throw 'Shortcut recreation preserved stale Shell Link metadata or wrote incorrect launch properties.'
+  }
+
+  $expectedPowerShellHost = (Get-Process -Id $PID -ErrorAction Stop).Path
+  if (-not (Test-DreamSkinPathEqual -Left (Get-DreamSkinPowerShellHostPath) -Right $expectedPowerShellHost)) {
+    throw 'PowerShell host resolution did not preserve the working installer host.'
+  }
+  $powerShellLauncher = Join-Path $Root 'scripts\dream-skin-powershell.cmd'
+  $launcherOutput = @(& $env:ComSpec /d /c "`"$powerShellLauncher`" -Command `"Write-Output DREAM_SKIN_HOST_OK; exit 19`"" 2>&1)
+  $launcherExitCode = $LASTEXITCODE
+  if ($launcherExitCode -ne 19 -or ($launcherOutput -join "`n") -notmatch '(?m)^DREAM_SKIN_HOST_OK$') {
+    throw "PowerShell launcher did not execute a working host (exit $launcherExitCode): $($launcherOutput -join ' ')"
+  }
+
   $node = Get-DreamSkinNodeRuntime
+  $developmentBuiltInRoot = Join-Path $Root 'skins\rose-garden'
+  $builtInRoot = if (Test-Path -LiteralPath $developmentBuiltInRoot -PathType Container) {
+    $developmentBuiltInRoot
+  } else {
+    Join-Path $Root 'assets\builtin\rose-garden'
+  }
+  $rendererPayload = Get-Content -Raw -LiteralPath (Join-Path $Root 'assets\renderer-inject.js')
+  $skinCss = Get-Content -Raw -LiteralPath (Join-Path $builtInRoot 'dream-skin.css')
+  $roundedShellBlocks = @(
+    @{ Name = 'sidebar'; Pattern = '(?s)html\.codex-dream-skin aside\.app-shell-left-panel\s*\{(?<Body>.*?)\}'; Expected = 'border-radius: 20px !important;' },
+    @{ Name = 'main surface'; Pattern = '(?s)html\.codex-dream-skin main\.main-surface\s*\{(?<Body>.*?)\}'; Expected = 'border-radius: 20px !important;' },
+    @{ Name = 'conversation header'; Pattern = '(?s)html\.codex-dream-skin main\.main-surface > header\.app-header-tint\s*\{(?<Body>.*?)\}'; Expected = 'border-radius: 19px 19px 0 0 !important;' },
+    @{ Name = 'decorative chrome'; Pattern = '(?s)#codex-dream-skin-chrome\s*\{(?<Body>.*?)\}'; Expected = 'border-radius: 20px;' }
+  )
+  foreach ($block in $roundedShellBlocks) {
+    $match = [regex]::Match($skinCss, $block.Pattern)
+    if (-not $match.Success -or -not $match.Groups['Body'].Value.Contains($block.Expected)) {
+      throw "Complete rounded-corner styling is missing for $($block.Name)."
+    }
+  }
+  foreach ($roundedControlMarker in @(
+    'html.codex-dream-skin aside.app-shell-left-panel button',
+    'html.codex-dream-skin [role="alert"]',
+    'html.codex-dream-skin pre',
+    'html.codex-dream-skin blockquote'
+  )) {
+    if (-not $skinCss.Contains($roundedControlMarker)) {
+      throw "Rounded control styling is missing marker: $roundedControlMarker"
+    }
+  }
+  foreach ($requiredMarker in @('dream-home-task-mode', 'dream-task-suggestions', 'dream-task-suggestion')) {
+    if (-not $rendererPayload.Contains($requiredMarker) -or -not $skinCss.Contains($requiredMarker)) {
+      throw "Responsive task-suggestion styling is missing marker: $requiredMarker"
+    }
+  }
+  foreach ($shellMarker in @(
+    'dream-windows-menu-bar',
+    'dream-shell-attached-main',
+    'dream-shell-attached-sidebar',
+    'integrateWindowsShell'
+  )) {
+    if (-not $rendererPayload.Contains($shellMarker)) {
+      throw "Connected Windows shell compatibility is missing marker: $shellMarker"
+    }
+  }
+  $injectorSource = Get-Content -Raw -LiteralPath (Join-Path $Root 'scripts\injector.mjs')
+  foreach ($shellMarker in @('connectedLeftCorners', 'connectedRightCorners', 'shellSeamPass')) {
+    if (-not $injectorSource.Contains($shellMarker)) {
+      throw "Connected-shell verification is missing marker: $shellMarker"
+    }
+  }
+  $themeV2Runtime = Get-Content -Raw -LiteralPath (Join-Path $Root 'scripts\theme-v2\runtime\theme-runtime.js')
+  foreach ($shellMarker in @('cts-shell-attached-main', 'cts-shell-attached-sidebar', 'integrateShellSeam')) {
+    if (-not $themeV2Runtime.Contains($shellMarker)) {
+      throw "Theme v2 connected-shell compatibility is missing marker: $shellMarker"
+    }
+  }
+  $violetCssPath = Join-Path $Root 'assets\dream-skin.css'
+  if (Test-Path -LiteralPath $violetCssPath -PathType Leaf) {
+    $violetCss = Get-Content -Raw -LiteralPath $violetCssPath
+    if ($violetCss.Contains('/* Violet Riviera portrait overrides */') -and
+      -not $violetCss.Contains('background-position: center, center top !important;')) {
+      throw 'Violet Riviera hero does not keep the portrait face inside the wide banner crop.'
+    }
+  }
   & $node.Path (Join-Path $Root 'scripts\injector.mjs') --self-test *> $null
   if ($LASTEXITCODE -ne 0) { throw 'Injector CDP self-test failed.' }
-  & $node.Path (Join-Path $Root 'scripts\injector.mjs') --check-payload *> $null
-  if ($LASTEXITCODE -ne 0) { throw 'Injector self-test failed.' }
+
+  $defaultLocalAppData = Join-Path $temporaryRoot 'default-skin-local-app-data'
+  New-Item -ItemType Directory -Path $defaultLocalAppData -Force | Out-Null
+  $savedLocalAppData = $env:LOCALAPPDATA
+  $savedManagedSkinStateRoot = $env:CODEX_DREAM_SKIN_STATE_ROOT
+  try {
+    $env:LOCALAPPDATA = $defaultLocalAppData
+    $env:CODEX_DREAM_SKIN_STATE_ROOT = $null
+    $defaultPayloadOutput = @(& $node.Path (Join-Path $Root 'scripts\injector.mjs') --check-payload 2>&1)
+    if ($LASTEXITCODE -ne 0) { throw "Default skin payload failed: $($defaultPayloadOutput -join ' ')" }
+    $defaultPayload = ($defaultPayloadOutput -join "`n") | ConvertFrom-Json
+    if (-not $defaultPayload.pass -or $defaultPayload.skinId -cne 'rose-garden') {
+      throw 'Injector did not select the isolated built-in skin when no active skin was configured.'
+    }
+    if ($defaultPayload.starlightEnabled -ne $true) {
+      throw 'Injector did not enable starlight effects by default.'
+    }
+  } finally {
+    $env:LOCALAPPDATA = $savedLocalAppData
+    $env:CODEX_DREAM_SKIN_STATE_ROOT = $savedManagedSkinStateRoot
+  }
+
+  $customLocalAppData = Join-Path $temporaryRoot 'custom-skin-local-app-data'
+  $customSkinRoot = Join-Path $customLocalAppData 'CodexDreamSkin\skins\test-skin'
+  New-Item -ItemType Directory -Path $customSkinRoot -Force | Out-Null
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $customSkinRoot 'skin.json') -Content `
+    '{"schemaVersion":1,"id":"test-skin","name":"Test Skin","version":"1.0.0","author":"Tests","description":"Fixture","brandName":"Test Skin","brandSubtitle":"Fixture","signature":"Test"}'
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $customSkinRoot 'dream-skin.css') -Content `
+    'html.codex-dream-skin { --dream-test-skin: 1; }'
+  Copy-Item -LiteralPath (Join-Path $builtInRoot 'art.png') -Destination (Join-Path $customSkinRoot 'art.png')
+  $customStateRoot = Join-Path $customLocalAppData 'CodexDreamSkin'
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $customStateRoot 'active-skin.json') -Content `
+    '{"schemaVersion":1,"skinId":"test-skin","starlightEnabled":false}'
+  $savedLocalAppData = $env:LOCALAPPDATA
+  $savedManagedSkinStateRoot = $env:CODEX_DREAM_SKIN_STATE_ROOT
+  try {
+    $env:LOCALAPPDATA = $customLocalAppData
+    $env:CODEX_DREAM_SKIN_STATE_ROOT = $null
+    $customPayloadOutput = @(& $node.Path (Join-Path $Root 'scripts\injector.mjs') --check-payload 2>&1)
+    if ($LASTEXITCODE -ne 0) { throw "Custom skin payload failed: $($customPayloadOutput -join ' ')" }
+    $customPayload = ($customPayloadOutput -join "`n") | ConvertFrom-Json
+    if (-not $customPayload.pass -or $customPayload.skinId -cne 'test-skin') {
+      throw 'Injector did not select the managed active skin.'
+    }
+    if ($customPayload.starlightEnabled -ne $false) {
+      throw 'Injector did not pass the managed starlight preference into the payload.'
+    }
+    Write-DreamSkinUtf8FileAtomically -Path (Join-Path $customSkinRoot 'dream-skin.css') -Content `
+      '@import url("https://example.com/unsafe.css");'
+    & $node.Path (Join-Path $Root 'scripts\injector.mjs') --check-payload *> $null
+    if ($LASTEXITCODE -eq 0) { throw 'Injector accepted skin CSS containing a remote import.' }
+  } finally {
+    $env:LOCALAPPDATA = $savedLocalAppData
+    $env:CODEX_DREAM_SKIN_STATE_ROOT = $savedManagedSkinStateRoot
+  }
+
+  $portableStateRoot = Join-Path $temporaryRoot 'codex-skin-manager'
+  $portableSkinRoot = Join-Path $portableStateRoot 'skin\portable-test'
+  New-Item -ItemType Directory -Path $portableSkinRoot -Force | Out-Null
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $portableSkinRoot 'skin.json') -Content `
+    '{"schemaVersion":1,"id":"portable-test","name":"Portable Test","version":"1.0.0","author":"Tests","description":"Fixture","brandName":"Portable Test","brandSubtitle":"Fixture","signature":"Test"}'
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $portableSkinRoot 'dream-skin.css') -Content `
+    'html.codex-dream-skin { --dream-portable-skin: 1; }'
+  Copy-Item -LiteralPath (Join-Path $builtInRoot 'art.png') -Destination (Join-Path $portableSkinRoot 'art.png')
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $portableStateRoot 'active-skin.json') -Content `
+    '{"schemaVersion":1,"skinId":"portable-test","starlightEnabled":false}'
+  $savedPortableStateRoot = $env:CODEX_DREAM_SKIN_STATE_ROOT
+  try {
+    $env:CODEX_DREAM_SKIN_STATE_ROOT = $portableStateRoot
+    $portablePayloadOutput = @(& $node.Path (Join-Path $Root 'scripts\injector.mjs') --check-payload 2>&1)
+    if ($LASTEXITCODE -ne 0) { throw "Portable skin payload failed: $($portablePayloadOutput -join ' ')" }
+    $portablePayload = ($portablePayloadOutput -join "`n") | ConvertFrom-Json
+    if (-not $portablePayload.pass -or $portablePayload.skinId -cne 'portable-test') {
+      throw 'Injector did not select the skin from codex-skin-manager\skin.'
+    }
+    if ($portablePayload.starlightEnabled -ne $false) {
+      throw 'Injector did not pass the portable starlight preference into the payload.'
+    }
+  } finally {
+    $env:CODEX_DREAM_SKIN_STATE_ROOT = $savedPortableStateRoot
+  }
+
+  $awesomeStateRoot = Join-Path $temporaryRoot 'awesome-v2-state'
+  $awesomeThemeRoot = Join-Path $awesomeStateRoot 'skin\awesome-v2-test'
+  New-Item -ItemType Directory -Path $awesomeThemeRoot -Force | Out-Null
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $awesomeThemeRoot 'theme.json') -Content `
+    '{"schemaVersion":2,"id":"awesome-v2-test","name":"Awesome V2 Test","version":"1.0.0","author":"Tests","description":"Fixture","appearance":"dual","css":"theme.css","chrome":"chrome.html","assets":{}}'
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $awesomeThemeRoot 'theme.css') -Content `
+    'html.codex-theme-studio { --awesome-v2-test: 1; }'
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $awesomeThemeRoot 'chrome.html') -Content `
+    '<div data-cts-layer="stage"><i data-cts-text="hero-title"></i></div>'
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $awesomeStateRoot 'active-skin.json') -Content `
+    '{"schemaVersion":1,"skinId":"awesome-v2-test"}'
+  $savedAwesomeStateRoot = $env:CODEX_DREAM_SKIN_STATE_ROOT
+  try {
+    $env:CODEX_DREAM_SKIN_STATE_ROOT = $awesomeStateRoot
+    $awesomePayloadOutput = @(& $node.Path (Join-Path $Root 'scripts\injector.mjs') --check-payload 2>&1)
+    if ($LASTEXITCODE -ne 0) { throw "Awesome v2 payload failed: $($awesomePayloadOutput -join ' ')" }
+    $awesomePayload = ($awesomePayloadOutput -join "`n") | ConvertFrom-Json
+    if (-not $awesomePayload.pass -or $awesomePayload.skinId -cne 'awesome-v2-test' -or
+      $awesomePayload.format -cne 'awesome-v2') {
+      throw 'Injector did not select the awesome schema v2 runtime.'
+    }
+    Write-DreamSkinUtf8FileAtomically -Path (Join-Path $awesomeThemeRoot 'theme.css') -Content `
+      '@import url("https://example.com/unsafe-v2.css");'
+    & $node.Path (Join-Path $Root 'scripts\injector.mjs') --check-payload *> $null
+    if ($LASTEXITCODE -eq 0) { throw 'Injector accepted unsafe awesome schema v2 CSS.' }
+  } finally {
+    $env:CODEX_DREAM_SKIN_STATE_ROOT = $savedAwesomeStateRoot
+  }
 
   Write-Host 'PASS: config transactions, restore scoping, state safety, argument quoting, and loopback CDP validation.'
 } finally {

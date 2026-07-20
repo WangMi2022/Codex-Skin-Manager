@@ -99,7 +99,9 @@ function Write-DreamSkinBytesAtomically {
     [System.IO.Directory]::CreateDirectory($directory) | Out-Null
   }
   $fileName = [System.IO.Path]::GetFileName($fullPath)
-  $temporary = Join-Path $directory ".$fileName.$PID.$([guid]::NewGuid().ToString('N')).tmp"
+  $operationId = "$PID.$([guid]::NewGuid().ToString('N'))"
+  $temporary = Join-Path $directory ".$fileName.$operationId.tmp"
+  $replacementBackup = Join-Path $directory ".$fileName.$operationId.replace-backup"
 
   try {
     [System.IO.File]::WriteAllBytes($temporary, $Bytes)
@@ -107,12 +109,13 @@ function Write-DreamSkinBytesAtomically {
       Assert-DreamSkinFileUnchanged -Path $fullPath -ExpectedBytes $ExpectedBytes
     }
     if ([System.IO.File]::Exists($fullPath)) {
-      [System.IO.File]::Replace($temporary, $fullPath, $null)
+      [System.IO.File]::Replace($temporary, $fullPath, $replacementBackup, $true)
     } else {
       [System.IO.File]::Move($temporary, $fullPath)
     }
   } finally {
     if ([System.IO.File]::Exists($temporary)) { [System.IO.File]::Delete($temporary) }
+    if ([System.IO.File]::Exists($replacementBackup)) { [System.IO.File]::Delete($replacementBackup) }
   }
 }
 
@@ -167,7 +170,7 @@ function Assert-DreamSkinTomlLineEditingSafe {
   if ($Content.Contains('"""') -or $Content.Contains("'''")) {
     throw 'Refusing to rewrite TOML containing multiline strings; use single-line values before installing Dream Skin.'
   }
-  foreach ($match in [regex]::Matches($Content, '(?m)^[^\r\n]*=[\t ]*\[[^\r\n]*$')) {
+  foreach ($match in [regex]::Matches($Content, '(?m)^[^\r\n]*=[\t ]*\[[^\r\n]*\r?$')) {
     if ((Get-DreamSkinTomlArrayBracketBalance -Line $match.Value) -ne 0) {
       throw 'Refusing to rewrite TOML containing multiline arrays; use single-line arrays before installing Dream Skin.'
     }
@@ -269,7 +272,7 @@ function Set-DreamSkinSectionSetting {
   if ($matcher.Matches($Body).Count -gt 1) {
     throw "Refusing to rewrite duplicate '$Key' entries in the [desktop] section."
   }
-  if ($null -eq $Line) { return $matcher.Replace($Body, '', 1) }
+  if ([string]::IsNullOrEmpty($Line)) { return $matcher.Replace($Body, '', 1) }
   $normalizedLine = $Line.TrimEnd("`r", "`n") + $NewLine
   if ($matcher.IsMatch($Body)) {
     $literalReplacement = $normalizedLine.Replace('$', '$$')
@@ -312,7 +315,7 @@ function Install-DreamSkinBaseTheme {
     $settings = [ordered]@{
       appearanceTheme = 'appearanceTheme = "light"'
       appearanceLightCodeThemeId = 'appearanceLightCodeThemeId = "codex"'
-      appearanceLightChromeTheme = 'appearanceLightChromeTheme = { accent = "#B65CFF", contrast = 64, fonts = { code = "Cascadia Code", ui = "Microsoft YaHei UI" }, ink = "#4A235F", opaqueWindows = true, semanticColors = { diffAdded = "#BCE8CF", diffRemoved = "#F7B8CE", skill = "#C47BFF" }, surface = "#FFF4FA" }'
+      appearanceLightChromeTheme = 'appearanceLightChromeTheme = { accent = "#C56F5E", contrast = 64, fonts = { code = "Cascadia Code", ui = "Microsoft YaHei UI" }, ink = "#4B3435", opaqueWindows = true, semanticColors = { diffAdded = "#BFDCCA", diffRemoved = "#E8B3A7", skill = "#70A9B4" }, surface = "#FAF3E7" }'
     }
     foreach ($key in $settings.Keys) {
       $body = Set-DreamSkinSectionSetting -Body $body -Key $key -Line $settings[$key] -NewLine $newLine

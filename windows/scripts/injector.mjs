@@ -1,12 +1,22 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  buildPayload as buildThemeV2Payload,
+  REMOVE_EXPRESSION as REMOVE_THEME_V2_EXPRESSION,
+  VERIFY_REMOVED_EXPRESSION as VERIFY_THEME_V2_REMOVED_EXPRESSION,
+  verifyExpression as themeV2VerifyExpression,
+} from "./theme-v2/payload.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
-const SKIN_VERSION = "1.0.0";
+const SKIN_VERSION = "2.0.0";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 const BROWSER_ID_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
+const SKIN_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+const MAX_SKIN_CSS_BYTES = 2 * 1024 * 1024;
+const MAX_SKIN_ART_BYTES = 20 * 1024 * 1024;
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 class CdpIdentityMismatchError extends Error {}
 
@@ -18,6 +28,9 @@ function parseArgs(argv) {
     screenshot: null,
     reload: false,
     browserId: null,
+    skinStateRoot: process.env.CODEX_DREAM_SKIN_STATE_ROOT
+      ? path.resolve(process.env.CODEX_DREAM_SKIN_STATE_ROOT)
+      : null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -266,16 +279,175 @@ async function connectBrowserIdentityAnchor(port, expectedBrowserId) {
   return new BrowserIdentityAnchor(validatedDebuggerUrl(version, port)).open();
 }
 
-async function loadPayload() {
-  const [css, template, art] = await Promise.all([
-    fs.readFile(path.join(root, "assets", "dream-skin.css"), "utf8"),
+function normalizedSkinText(value, fallback, maximumLength) {
+  if (typeof value !== "string") return fallback;
+  const normalized = value.trim().replace(/[\u0000-\u001f\u007f]/g, " ");
+  return normalized ? normalized.slice(0, maximumLength) : fallback;
+}
+
+function validateSkinManifest(value, expectedId) {
+  if (!value || Array.isArray(value) || typeof value !== "object") {
+    throw new Error("Skin manifest must be a JSON object");
+  }
+  if (value.schemaVersion !== 1 || !SKIN_ID_PATTERN.test(value.id) || value.id !== expectedId) {
+    throw new Error(`Invalid skin manifest identity: ${expectedId}`);
+  }
+  return {
+    schemaVersion: 1,
+    id: value.id,
+    name: normalizedSkinText(value.name, value.id, 60),
+    version: normalizedSkinText(value.version, "1.0.0", 24),
+    author: normalizedSkinText(value.author, "Local skin", 60),
+    description: normalizedSkinText(value.description, "", 160),
+    brandName: normalizedSkinText(value.brandName, value.name || value.id, 80),
+    brandSubtitle: normalizedSkinText(value.brandSubtitle, "Codex Dream Skin", 100),
+    signature: normalizedSkinText(value.signature, value.name || value.id, 60),
+  };
+}
+
+function assertSafeSkinCss(css) {
+  if (/@import\b/i.test(css) || /url\s*\(\s*(['"])?\s*(?:https?:|javascript:|data:text\/html)/i.test(css)) {
+    throw new Error("Skin CSS cannot import or request remote content");
+  }
+}
+
+function resolveThemeV2File(directory, relative, label) {
+  if (typeof relative !== "string" || !relative.trim() || path.isAbsolute(relative)) {
+    throw new Error(`${label} must be a relative file inside the theme directory`);
+  }
+  const resolved = path.resolve(directory, relative);
+  const prefix = `${path.resolve(directory)}${path.sep}`;
+  if (!resolved.startsWith(prefix)) throw new Error(`${label} resolved outside the theme directory`);
+  return resolved;
+}
+
+function assertSafeThemeV2Chrome(html) {
+  if (/<\s*(?:script|iframe|object|embed|link|meta|base)\b/i.test(html) ||
+      /\son[a-z0-9_-]+\s*=/i.test(html) || /(?:javascript|vbscript)\s*:/i.test(html) ||
+      /(?:src|href)\s*=\s*(["'])?\s*(?:https?:|data:text\/html)/i.test(html)) {
+    throw new Error("Theme v2 chrome.html contains executable or remote content");
+  }
+}
+
+async function assertSafeThemeV2(directory, expectedId) {
+  const manifestText = await readStrictUtf8(path.join(directory, "theme.json"), 256 * 1024);
+  const manifest = JSON.parse(manifestText);
+  if (!manifest || Array.isArray(manifest) || manifest.schemaVersion !== 2 ||
+      typeof manifest.id !== "string" || !SKIN_ID_PATTERN.test(manifest.id) || manifest.id !== expectedId) {
+    throw new Error("Theme v2 manifest version or ID is invalid");
+  }
+  const cssPath = resolveThemeV2File(directory, manifest.css || "theme.css", "theme.css");
+  assertSafeSkinCss(await readStrictUtf8(cssPath, MAX_SKIN_CSS_BYTES));
+  if (manifest.chrome) {
+    const chromePath = resolveThemeV2File(directory, manifest.chrome, "chrome.html");
+    assertSafeThemeV2Chrome(await readStrictUtf8(chromePath, 512 * 1024));
+  }
+  return manifest;
+}
+
+async function readStrictUtf8(filePath, maximumBytes) {
+  const bytes = await fs.readFile(filePath);
+  if (bytes.length === 0 || bytes.length > maximumBytes) {
+    throw new Error(`Skin file has an invalid size: ${path.basename(filePath)}`);
+  }
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+}
+
+async function resolveBuiltInDirectory() {
+  const development = path.join(root, "skins", "rose-garden");
+  try {
+    const info = await fs.stat(development);
+    if (info.isDirectory()) return development;
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  return path.join(root, "assets", "builtin", "rose-garden");
+}
+
+async function loadSkinSource(options) {
+  const builtInDirectory = await resolveBuiltInDirectory();
+  const defaultSource = {
+    format: "dream-v1",
+    directory: builtInDirectory,
+    manifestPath: path.join(builtInDirectory, "skin.json"),
+    cssPath: path.join(builtInDirectory, "dream-skin.css"),
+    artPath: path.join(builtInDirectory, "art.png"),
+    expectedId: "rose-garden",
+    starlightEnabled: true,
+  };
+  const localAppData = process.env.LOCALAPPDATA;
+  if (!options.skinStateRoot && !localAppData) return defaultSource;
+
+  const stateRoot = options.skinStateRoot ?? path.resolve(localAppData, "CodexDreamSkin");
+  const activePath = path.join(stateRoot, "active-skin.json");
+  let active;
+  try {
+    active = JSON.parse(await readStrictUtf8(activePath, 64 * 1024));
+  } catch (error) {
+    if (error?.code === "ENOENT") return defaultSource;
+    throw new Error(`Active skin configuration is invalid: ${error.message}`);
+  }
+  if (!active || Array.isArray(active) || active.schemaVersion !== 1 ||
+      typeof active.skinId !== "string" || !SKIN_ID_PATTERN.test(active.skinId)) {
+    throw new Error("Active skin configuration has an invalid skinId");
+  }
+  const starlightEnabled = active.starlightEnabled !== false;
+
+  const skinsRoot = path.resolve(stateRoot, options.skinStateRoot ? "skin" : "skins");
+  const directory = path.resolve(skinsRoot, active.skinId);
+  const relative = path.relative(skinsRoot, directory);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error("Active skin resolved outside the managed skin directory");
+  }
+  try {
+    const stat = await fs.stat(path.join(directory, "theme.json"));
+    if (stat.isFile()) return { format: "awesome-v2", directory, expectedId: active.skinId, starlightEnabled };
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  return {
+    format: "dream-v1", directory,
+    manifestPath: path.join(directory, "skin.json"),
+    cssPath: path.join(directory, "dream-skin.css"),
+    artPath: path.join(directory, "art.png"),
+    expectedId: active.skinId,
+    starlightEnabled,
+  };
+}
+
+async function loadPayload(options) {
+  const source = await loadSkinSource(options);
+  if (source.format === "awesome-v2") {
+    const manifest = await assertSafeThemeV2(source.directory, source.expectedId);
+    const result = await buildThemeV2Payload(source.directory);
+    if (result.theme?.id !== source.expectedId) throw new Error("Theme v2 payload ID does not match the active skin");
+    return {
+      payload: result.payload,
+      skin: { id: result.theme.id, name: result.theme.name || manifest.name || result.theme.id,
+        starlightEnabled: source.starlightEnabled !== false },
+      format: source.format,
+      assetCount: result.assetCount,
+    };
+  }
+  const [css, template, art, manifestText] = await Promise.all([
+    readStrictUtf8(source.cssPath, MAX_SKIN_CSS_BYTES),
     fs.readFile(path.join(root, "assets", "renderer-inject.js"), "utf8"),
-    fs.readFile(path.join(root, "assets", "dream-reference.png")),
+    fs.readFile(source.artPath),
+    readStrictUtf8(source.manifestPath, 64 * 1024),
   ]);
+  if (art.length === 0 || art.length > MAX_SKIN_ART_BYTES ||
+      art.length < PNG_SIGNATURE.length || !art.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {
+    throw new Error(`Skin art must be a PNG smaller than ${MAX_SKIN_ART_BYTES} bytes`);
+  }
+  assertSafeSkinCss(css);
+  const manifest = validateSkinManifest(JSON.parse(manifestText), source.expectedId);
+  manifest.starlightEnabled = source.starlightEnabled !== false;
   const artDataUrl = `data:image/png;base64,${art.toString("base64")}`;
-  return template
+  const payload = template
     .replace("__DREAM_CSS_JSON__", JSON.stringify(css))
-    .replace("__DREAM_ART_JSON__", JSON.stringify(artDataUrl));
+    .replace("__DREAM_ART_JSON__", JSON.stringify(artDataUrl))
+    .replace("__DREAM_META_JSON__", JSON.stringify(manifest));
+  return { payload, skin: manifest, format: source.format, assetCount: 1 };
 }
 
 async function probeSession(session) {
@@ -328,82 +500,161 @@ async function connectCodexTargets(port, timeoutMs) {
 }
 
 async function applyToSession(session, payload) {
+  await removeFromSession(session);
   return session.evaluate(payload);
 }
 
 async function removeFromSession(session) {
-  return session.evaluate(`(() => {
+  await session.evaluate(`(() => {
     window.__CODEX_DREAM_SKIN_DISABLED__ = true;
     const state = window.__CODEX_DREAM_SKIN_STATE__;
     if (state?.cleanup) return state.cleanup();
     document.documentElement?.classList.remove('codex-dream-skin');
+    document.documentElement?.classList.remove('codex-dream-starlight-off');
     document.documentElement?.style.removeProperty('--dream-art');
+    if (document.documentElement) delete document.documentElement.dataset.dreamSkinId;
     document.querySelectorAll('.dream-home').forEach((node) => node.classList.remove('dream-home'));
     document.querySelectorAll('.dream-home-shell').forEach((node) => node.classList.remove('dream-home-shell'));
+    document.querySelectorAll('.dream-home-task-mode').forEach((node) => node.classList.remove('dream-home-task-mode'));
+    document.querySelectorAll('.dream-task-suggestions').forEach((node) => node.classList.remove('dream-task-suggestions'));
+    document.querySelectorAll('.dream-task-suggestion').forEach((node) => node.classList.remove('dream-task-suggestion'));
     document.getElementById('codex-dream-skin-style')?.remove();
     document.getElementById('codex-dream-skin-chrome')?.remove();
     delete window.__CODEX_DREAM_SKIN_STATE__;
     return true;
   })()`);
+  return session.evaluate(REMOVE_THEME_V2_EXPRESSION);
 }
 
 async function verifyRemovedSession(session) {
-  return session.evaluate(`(() =>
+  const dreamRemoved = await session.evaluate(`(() =>
     !document.documentElement.classList.contains('codex-dream-skin') &&
+    !document.documentElement.classList.contains('codex-dream-starlight-off') &&
     !document.documentElement.style.getPropertyValue('--dream-art') &&
+    !document.documentElement.dataset.dreamSkinId &&
     !document.querySelector('.dream-home') &&
     !document.querySelector('.dream-home-shell') &&
     !document.getElementById('codex-dream-skin-style') &&
     !document.getElementById('codex-dream-skin-chrome') &&
     !window.__CODEX_DREAM_SKIN_STATE__
   )()`);
+  const themeV2Removed = await session.evaluate(VERIFY_THEME_V2_REMOVED_EXPRESSION);
+  return dreamRemoved && themeV2Removed;
 }
 
-async function verifySession(session) {
+async function verifySession(session, format) {
+  if (format === "awesome-v2") return session.evaluate(themeV2VerifyExpression());
   return session.evaluate(`(() => {
     const box = (node) => {
       if (!node) return null;
       const r = node.getBoundingClientRect();
       return { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) };
     };
+    const corners = (node) => {
+      if (!node) return null;
+      const style = getComputedStyle(node);
+      return {
+        topLeft: parseFloat(style.borderTopLeftRadius) || 0,
+        topRight: parseFloat(style.borderTopRightRadius) || 0,
+        bottomRight: parseFloat(style.borderBottomRightRadius) || 0,
+        bottomLeft: parseFloat(style.borderBottomLeftRadius) || 0,
+      };
+    };
+    const everyCornerAtLeast = (value, minimum) => value && Object.values(value).every((radius) => radius >= minimum);
+    const connectedLeftCorners = (value, minimum) => value &&
+      value.topLeft >= minimum && value.bottomLeft >= minimum &&
+      value.topRight <= 1 && value.bottomRight <= 1;
+    const connectedRightCorners = (value, minimum) => value &&
+      value.topRight >= minimum && value.bottomRight >= minimum &&
+      value.topLeft <= 1 && value.bottomLeft <= 1;
     const home = document.querySelector('.dream-home');
     const suggestions = home?.querySelector('.group\\\\/home-suggestions') ?? null;
     const cards = suggestions ? [...suggestions.querySelectorAll('button')].map(box) : [];
+    const taskContainer = home?.querySelector('.dream-task-suggestions') ?? null;
+    const taskCards = taskContainer ? [...taskContainer.querySelectorAll('.dream-task-suggestion')] : [];
+    const taskStyle = taskContainer ? getComputedStyle(taskContainer) : null;
+    const taskColumns = taskStyle?.gridTemplateColumns === 'none'
+      ? 0
+      : taskStyle?.gridTemplateColumns.split(/\\s+/).filter(Boolean).length ?? 0;
+    const taskDecorationsHidden = taskCards.length === 0 || ['.dream-polaroid', '.dream-ribbon'].every((selector) => {
+      const node = document.querySelector(selector);
+      return !node || getComputedStyle(node).display === 'none';
+    });
+    const sidebarNode = document.querySelector('aside.app-shell-left-panel');
+    const mainSurfaceNode = document.querySelector('main.main-surface');
+    const chromeNode = document.getElementById('codex-dream-skin-chrome');
+    const composerNode = document.querySelector('.composer-surface-chrome');
+    const windowsMenuNode = document.querySelector('.app-header-tint[class~="group/application-menu-top-bar"]');
     const result = {
       installed: document.documentElement.classList.contains('codex-dream-skin'),
       version: window.__CODEX_DREAM_SKIN_STATE__?.version ?? null,
+      skinId: window.__CODEX_DREAM_SKIN_STATE__?.skinId ?? null,
+      starlightEnabled: window.__CODEX_DREAM_SKIN_STATE__?.starlightEnabled ?? true,
+      documentSkinId: document.documentElement.dataset.dreamSkinId ?? null,
       expectedVersion: ${JSON.stringify(SKIN_VERSION)},
       stylePresent: Boolean(document.getElementById('codex-dream-skin-style')),
       chromePresent: Boolean(document.getElementById('codex-dream-skin-chrome')),
-      chromePointerEvents: getComputedStyle(document.getElementById('codex-dream-skin-chrome') || document.body).pointerEvents,
+      chromePointerEvents: getComputedStyle(chromeNode || document.body).pointerEvents,
+      windowsMenuIntegrated: !windowsMenuNode || windowsMenuNode.classList.contains('dream-windows-menu-bar'),
+      shellAttached: Boolean(sidebarNode?.classList.contains('dream-shell-attached-main') &&
+        mainSurfaceNode?.classList.contains('dream-shell-attached-sidebar')),
       homePresent: Boolean(home),
       suggestionsPresent: Boolean(suggestions),
       hero: box(home?.firstElementChild?.firstElementChild?.firstElementChild),
       cards,
-      composer: box(document.querySelector('.composer-surface-chrome')),
-      sidebar: box(document.querySelector('aside.app-shell-left-panel')),
+      taskGrid: box(taskContainer),
+      taskCards: taskCards.map(box),
+      taskColumns,
+      taskDecorationsHidden,
+      composer: box(composerNode),
+      sidebar: box(sidebarNode),
+      mainSurface: box(mainSurfaceNode),
+      roundedCorners: {
+        sidebar: corners(sidebarNode),
+        mainSurface: corners(mainSurfaceNode),
+        chrome: corners(chromeNode),
+        composer: corners(composerNode),
+      },
       viewport: { width: innerWidth, height: innerHeight },
       documentOverflow: {
         x: document.documentElement.scrollWidth > document.documentElement.clientWidth,
         y: document.documentElement.scrollHeight > document.documentElement.clientHeight,
       },
     };
+    result.taskGap = result.taskCards.length > 0 && result.hero
+      ? result.taskCards[0].y - (result.hero.y + result.hero.height)
+      : null;
+    result.shellSeamPass = !result.shellAttached || Boolean(result.sidebar && result.mainSurface &&
+      Math.abs(result.sidebar.x + result.sidebar.width - result.mainSurface.x) <= 2 &&
+      Math.abs(result.sidebar.y - result.mainSurface.y) <= 2);
+    result.roundedShellPass = (result.shellAttached
+      ? connectedLeftCorners(result.roundedCorners.sidebar, 18) &&
+        connectedRightCorners(result.roundedCorners.mainSurface, 18) &&
+        connectedRightCorners(result.roundedCorners.chrome, 18)
+      : everyCornerAtLeast(result.roundedCorners.sidebar, 18) &&
+        everyCornerAtLeast(result.roundedCorners.mainSurface, 18) &&
+        everyCornerAtLeast(result.roundedCorners.chrome, 18)) &&
+      everyCornerAtLeast(result.roundedCorners.composer, 20);
     result.pass = result.installed && result.version === result.expectedVersion &&
-      result.stylePresent && result.chromePresent &&
-      result.chromePointerEvents === 'none' && Boolean(result.composer) && Boolean(result.sidebar) &&
+      Boolean(result.skinId) && result.skinId === result.documentSkinId &&
+      result.stylePresent && result.chromePresent && result.windowsMenuIntegrated && result.shellSeamPass &&
+      result.chromePointerEvents === 'none' && Boolean(result.composer) && Boolean(result.sidebar) && result.roundedShellPass &&
       (!result.homePresent || (Boolean(result.hero) &&
-        (!result.suggestionsPresent || (result.cards.length >= 2 && result.cards.length <= 4))));
+        (!result.suggestionsPresent || (result.cards.length >= 2 && result.cards.length <= 4)))) &&
+      (result.taskCards.length === 0 || (result.taskColumns >= 2 &&
+        result.taskCards.every((card) => card.height <= 112) && result.taskDecorationsHidden &&
+        result.taskGap >= 12));
     return result;
   })()`);
 }
 
-async function waitForVerifiedSession(session, timeoutMs) {
+async function waitForVerifiedSession(session, timeoutMs, format) {
   const deadline = Date.now() + timeoutMs;
   let lastResult;
   let lastError;
   while (Date.now() < deadline) {
     try {
-      lastResult = await verifySession(session);
+      lastResult = await verifySession(session, format);
       lastError = null;
       if (lastResult.pass) return lastResult;
     } catch (error) {
@@ -437,7 +688,10 @@ async function capture(session, outputPath) {
 
 async function runOneShot(options) {
   const connected = await connectCodexTargets(options.port, options.timeoutMs);
-  const payload = (options.mode === "once" || options.reload) ? await loadPayload() : null;
+  const selectedSource = options.mode === "remove" ? null : await loadSkinSource(options);
+  const loaded = (options.mode === "once" || options.reload) ? await loadPayload(options) : null;
+  const payload = loaded?.payload ?? null;
+  const format = loaded?.format ?? selectedSource?.format ?? "dream-v1";
   const results = [];
   let screenshotCaptured = false;
   try {
@@ -456,8 +710,8 @@ async function runOneShot(options) {
         const verified = options.mode === "remove"
           ? await verifyRemovedSession(session)
           : (options.reload || options.mode === "once" || options.mode === "verify")
-            ? await waitForVerifiedSession(session, options.timeoutMs)
-            : await verifySession(session);
+            ? await waitForVerifiedSession(session, options.timeoutMs, format)
+            : await verifySession(session, format);
         results.push({ targetId: target.id, markers: probe.markers, result: verified });
         if (options.screenshot && !screenshotCaptured) {
           await capture(session, options.screenshot);
@@ -499,7 +753,7 @@ async function runWatch(options) {
   process.on("SIGTERM", stop);
 
   try {
-    const payload = await loadPayload();
+    const { payload } = await loadPayload(options);
     while (!stopping) {
       if (identityAnchor.closed) {
         console.error("[dream-skin] original CDP browser identity closed; watcher is stopping instead of reconnecting");
@@ -622,10 +876,13 @@ if (options.mode === "self-test") {
   }
   console.log(JSON.stringify({ pass: true, version: SKIN_VERSION, test: "loopback-cdp-validation" }));
 } else if (options.mode === "check-payload") {
-  const payload = await loadPayload();
-  if (payload.includes("__DREAM_CSS_JSON__") || payload.includes("__DREAM_ART_JSON__")) {
-    throw new Error("Payload placeholders were not fully replaced");
-  }
-  console.log(JSON.stringify({ pass: true, version: SKIN_VERSION, payloadBytes: Buffer.byteLength(payload) }));
+  const { payload, skin, format, assetCount } = await loadPayload(options);
+  const unresolved = format === "awesome-v2"
+    ? ["__CTS_CSS_JSON__", "__CTS_THEME_JSON__", "__CTS_CHROME_JSON__", "__CTS_MOTION_JSON__"]
+    : ["__DREAM_CSS_JSON__", "__DREAM_ART_JSON__", "__DREAM_META_JSON__"];
+  if (unresolved.some((marker) => payload.includes(marker))) throw new Error("Payload placeholders were not fully replaced");
+  console.log(JSON.stringify({ pass: true, version: SKIN_VERSION, skinId: skin.id,
+    starlightEnabled: skin.starlightEnabled !== false, format, assetCount,
+    payloadBytes: Buffer.byteLength(payload) }));
 } else if (options.mode === "watch") await runWatch(options);
 else await runOneShot(options);
