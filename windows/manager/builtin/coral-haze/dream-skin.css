@@ -1341,3 +1341,45 @@ html.codex-dream-skin .dream-home .group\/project-selector > button {
     inset 0 0 0 1px rgba(255,255,255,.72) !important;
 }
 
+/* Composer safety: keep bottom decorations and starlight clear of typed text. */
+html.codex-dream-skin:has(.composer-surface-chrome) #codex-dream-skin-chrome .dream-ribbon,
+html.codex-dream-skin:has(.composer-surface-chrome) #codex-dream-skin-chrome .dream-polaroid {
+  display: none !important;
+}
+
+html.codex-dream-skin #codex-dream-skin-chrome::before {
+  inset: 48px 18px 192px 18px !important;
+}
+
+html.codex-dream-skin #codex-dream-skin-chrome::after {
+  inset: 90px 22px 214px 22px !important;
+}
+
+html.codex-dream-skin .dream-sparkles {
+  inset: 48px 0 196px !important;
+  overflow: hidden !important;
+}
+
+html.codex-dream-skin main.main-surface::after {
+  inset: 62px 22px 206px 22px !important;
+  z-index: 1 !important;
+}
+
+html.codex-dream-skin .composer-surface-chrome {
+  position: relative !important;
+  z-index: 60 !important;
+  isolation: isolate !important;
+}
+
+html.codex-dream-skin .composer-surface-chrome::before {
+  left: -17px !important;
+  top: -17px !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+}
+
+html.codex-dream-skin .composer-surface-chrome :is(textarea, [contenteditable="true"], .ProseMirror) {
+  position: relative !important;
+  z-index: 3 !important;
+}
+
