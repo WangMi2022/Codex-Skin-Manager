@@ -580,6 +580,11 @@ async function verifySession(session, format) {
       const node = document.querySelector(selector);
       return !node || getComputedStyle(node).display === 'none';
     });
+    let projectPicker = null;
+    if (home) {
+      projectPicker = [...home.querySelectorAll('div')].find((node) =>
+        node.querySelector(':scope > .horizontal-scroll-fade-mask .group\\\\/project-selector')) ?? null;
+    }
     const sidebarNode = document.querySelector('aside.app-shell-left-panel');
     const mainSurfaceNode = document.querySelector('main.main-surface');
     const chromeNode = document.getElementById('codex-dream-skin-chrome');
@@ -606,6 +611,7 @@ async function verifySession(session, format) {
       taskCards: taskCards.map(box),
       taskColumns,
       taskDecorationsHidden,
+      projectPicker: box(projectPicker),
       composer: box(composerNode),
       sidebar: box(sidebarNode),
       mainSurface: box(mainSurfaceNode),
@@ -624,6 +630,10 @@ async function verifySession(session, format) {
     result.taskGap = result.taskCards.length > 0 && result.hero
       ? result.taskCards[0].y - (result.hero.y + result.hero.height)
       : null;
+    result.projectPickerGap = result.projectPicker && result.composer
+      ? result.composer.y - (result.projectPicker.y + result.projectPicker.height)
+      : null;
+    result.projectPickerPass = !result.projectPicker || !result.composer || result.projectPickerGap >= 8;
     result.shellSeamPass = !result.shellAttached || Boolean(result.sidebar && result.mainSurface &&
       Math.abs(result.sidebar.x + result.sidebar.width - result.mainSurface.x) <= 2 &&
       Math.abs(result.sidebar.y - result.mainSurface.y) <= 2);
@@ -638,7 +648,8 @@ async function verifySession(session, format) {
     result.pass = result.installed && result.version === result.expectedVersion &&
       Boolean(result.skinId) && result.skinId === result.documentSkinId &&
       result.stylePresent && result.chromePresent && result.windowsMenuIntegrated && result.shellSeamPass &&
-      result.chromePointerEvents === 'none' && Boolean(result.composer) && Boolean(result.sidebar) && result.roundedShellPass &&
+      result.chromePointerEvents === 'none' && Boolean(result.composer) && Boolean(result.sidebar) &&
+      result.roundedShellPass && result.projectPickerPass &&
       (!result.homePresent || (Boolean(result.hero) &&
         (!result.suggestionsPresent || (result.cards.length >= 2 && result.cards.length <= 4)))) &&
       (result.taskCards.length === 0 || (result.taskColumns >= 2 &&

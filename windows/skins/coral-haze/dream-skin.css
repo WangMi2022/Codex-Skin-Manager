@@ -1294,3 +1294,50 @@ html.codex-dream-skin aside.app-shell-left-panel [aria-current="page"] {
   box-shadow: 0 4px 14px rgba(75,52,53,.07) !important;
 }
 
+/* Project picker polish: keep the selector compact so it never collides with the composer. */
+html.codex-dream-skin .dream-home div:has(> .horizontal-scroll-fade-mask .group\/project-selector) {
+  display: inline-flex !important;
+  width: auto !important;
+  max-width: min(100%, 620px) !important;
+  min-height: 0 !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin: 0 0 14px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+html.codex-dream-skin .dream-home div:has(> .horizontal-scroll-fade-mask .group\/project-selector)::before {
+  position: static !important;
+  z-index: auto !important;
+  display: inline-flex !important;
+  height: 30px !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  margin: 0 !important;
+  color: #865b51 !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  text-shadow: 0 1px rgba(255,255,255,.86) !important;
+  white-space: nowrap !important;
+}
+
+html.codex-dream-skin .dream-home div:has(> .horizontal-scroll-fade-mask .group\/project-selector) > .horizontal-scroll-fade-mask {
+  width: auto !important;
+  max-width: min(100%, 460px) !important;
+  flex: 1 1 auto !important;
+}
+
+html.codex-dream-skin .dream-home .group\/project-selector > button {
+  min-height: 32px !important;
+  border-radius: 10px !important;
+  box-shadow:
+    0 2px 7px rgba(75,52,53,.08),
+    inset 0 0 0 1px rgba(255,255,255,.72) !important;
+}
+
