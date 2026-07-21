@@ -15,5 +15,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run Windows regression tests
         shell: pwsh
-        run: .\windows\tests\run-tests.ps1
-
+        run: |
+          $output = @(& .\windows\tests\run-tests.ps1 2>&1)
+          $exitCode = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+          if ($exitCode -ne 0) {
+            $detail = ($output | ForEach-Object { "$_" }) -join "`n"
+            $detail = $detail.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error title=Windows regression tests failed::$detail"
+            exit $exitCode
+          }
