@@ -22,10 +22,10 @@
     return URL.createObjectURL(new Blob([bytes], { type: "image/png" }));
   })();
   const meta = {
-    id: typeof skinMeta?.id === "string" ? skinMeta.id : "coral-haze",
-    brandName: typeof skinMeta?.brandName === "string" ? skinMeta.brandName : "晨雾珊瑚 · 专属皮肤",
-    brandSubtitle: typeof skinMeta?.brandSubtitle === "string" ? skinMeta.brandSubtitle : "Codex App 柔光限定版 ✦",
-    signature: typeof skinMeta?.signature === "string" ? skinMeta.signature : "Coral Haze ♡",
+    id: typeof skinMeta?.id === "string" ? skinMeta.id : "rose-garden",
+    brandName: typeof skinMeta?.brandName === "string" ? skinMeta.brandName : "玫瑰轻纱 · 专属皮肤",
+    brandSubtitle: typeof skinMeta?.brandSubtitle === "string" ? skinMeta.brandSubtitle : "Codex App 樱粉花园限定版 ✦",
+    signature: typeof skinMeta?.signature === "string" ? skinMeta.signature : "Rose Veil ♡",
     starlightEnabled: skinMeta?.starlightEnabled !== false,
   };
   const effectCssText = `
