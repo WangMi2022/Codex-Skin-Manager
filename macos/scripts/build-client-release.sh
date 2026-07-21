@@ -2,13 +2,23 @@
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
+RUN_TESTS="true"
+if [ "${1:-}" = "--skip-tests" ]; then
+  [ "${CI:-}" = "true" ] || {
+    printf '%s\n' '--skip-tests is only allowed after explicit CI validation.' >&2
+    exit 2
+  }
+  RUN_TESTS="false"
+  shift
+fi
+[ "$#" -le 1 ] || { printf 'Usage: %s [--skip-tests] [output.zip]\n' "$0" >&2; exit 2; }
 OUTPUT="${1:-$HOME/Desktop/Codex 主题编辑器.zip}"
 TMP="$(/usr/bin/mktemp -d /tmp/codex-dream-client.XXXXXX)"
 CLIENT_ROOT="$TMP/Codex 主题编辑器"
 ENGINE="$CLIENT_ROOT/.codex-dream-skin-studio"
 trap '/bin/rm -rf "$TMP"' EXIT
 
-"$ROOT/tests/run-tests.sh"
+if [ "$RUN_TESTS" = "true" ]; then "$ROOT/tests/run-tests.sh"; fi
 /bin/mkdir -p "$ENGINE"
 /usr/bin/rsync -a \
   --exclude '.git/' \

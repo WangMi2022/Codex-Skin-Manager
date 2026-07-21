@@ -2,6 +2,16 @@
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
+SKIP_DOCTOR="false"
+if [ "${1:-}" = "--skip-doctor" ]; then
+  [ "${CI:-}" = "true" ] || {
+    printf '%s\n' '--skip-doctor is only allowed in CI.' >&2
+    exit 2
+  }
+  SKIP_DOCTOR="true"
+  shift
+fi
+[ "$#" -eq 0 ] || { printf 'Unknown test argument: %s\n' "$1" >&2; exit 2; }
 NODE="${NODE:-/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node}"
 [ -x "$NODE" ] || { printf 'Codex bundled Node.js was not found: %s\n' "$NODE" >&2; exit 1; }
 
@@ -69,6 +79,13 @@ NO_DESKTOP_BACKUP="$TMP/theme-backup-without-desktop.json"
 /usr/bin/cmp -s "$NO_DESKTOP_CONFIG" "$TMP/original-without-desktop.toml"
 
 /usr/bin/env -u HOME /bin/bash -c '. "$1/scripts/common-macos.sh"; [ -n "$HOME" ] && [ "$SKIN_VERSION" = "1.1.2" ]' _ "$ROOT"
-"$ROOT/scripts/doctor-macos.sh" >/dev/null
+if [ "$SKIP_DOCTOR" = "true" ]; then
+  printf 'SKIP: signed Codex.app runtime doctor is unavailable on the clean CI runner.\n'
+else
+  "$ROOT/scripts/doctor-macos.sh" >/dev/null
+fi
 
-printf 'PASS: syntax, payload, custom-theme, config round-trips, HOME recovery, signature, and doctor checks.\n'
+printf 'PASS: syntax, payload, custom-theme, config round-trips, and HOME recovery checks.\n'
+if [ "$SKIP_DOCTOR" = "false" ]; then
+  printf 'PASS: signed Codex.app runtime and doctor checks.\n'
+fi

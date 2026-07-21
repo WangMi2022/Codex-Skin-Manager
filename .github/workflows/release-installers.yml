@@ -39,7 +39,9 @@ jobs:
         shell: bash
         run: |
           output="$RUNNER_TEMP/Codex-Dream-Skin-Setup-macOS-v1.1.2.zip"
-          ./macos/scripts/build-client-release.sh "$output"
+          node_path="$(command -v node)"
+          CI=true NODE="$node_path" ./macos/tests/run-tests.sh --skip-doctor
+          CI=true NODE="$node_path" ./macos/scripts/build-client-release.sh --skip-tests "$output"
           hash="$(/usr/bin/shasum -a 256 "$output" | /usr/bin/awk '{print $1}')"
           /usr/bin/printf '%s  %s\n' "$hash" "$(/usr/bin/basename "$output")" > "$output.sha256"
 
@@ -87,7 +89,18 @@ jobs:
             '' \
             '两个平台均附带 SHA-256 校验文件。' \
             > "$notes"
-          gh release create "$GITHUB_REF_NAME" release-assets/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --title 'Codex Skin Manager v2.5.4 / macOS Studio v1.1.2' \
-            --notes-file "$notes"
+          title='Codex Skin Manager v2.5.4 / macOS Studio v1.1.2'
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$title" \
+              --notes-file "$notes"
+            gh release upload "$GITHUB_REF_NAME" release-assets/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release-assets/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$title" \
+              --notes-file "$notes"
+          fi
