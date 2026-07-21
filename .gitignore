@@ -1,16 +1,32 @@
-**/.DS_Store
-*.log
-*.tmp
-.DS_Store
-.idea/
-.vscode/
-README.preview.html
-docs/readme-preview.html
-.codex_tmp/
-tmp/
-output/
+# Build outputs
 release/
-runtime/
+output/
+tmp/
+.codex_tmp/
 windows/manager/bin/
-windows/scripts/__pycache__/
-windows/scripts/generate-image2.env
+windows/manager/obj/
+
+# Local packages and state
+*.codexskin
+active-skin.json
+built-in-skin-preferences.json
+state.json
+*.log
+
+# Credentials and local environment
+*.env
+*.env.*
+!*.env.example
+auth.json
+config.toml
+
+# Generated executables (the verified libwebp runtime is intentionally tracked)
+*.exe
+!windows/runtime/webp/dwebp.exe
+
+# Editors and OS
+.vs/
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

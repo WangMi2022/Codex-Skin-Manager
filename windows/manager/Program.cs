@@ -8,8 +8,8 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("Import, preview, and switch schema v1/v2 Codex skins")]
 [assembly: AssemblyCompany("Codex Dream Skin")]
 [assembly: AssemblyProduct("Codex皮肤主题管理器")]
-[assembly: AssemblyVersion("2.3.3.0")]
-[assembly: AssemblyFileVersion("2.3.3.0")]
+[assembly: AssemblyVersion("2.5.4.0")]
+[assembly: AssemblyFileVersion("2.5.4.0")]
 
 namespace CodexDreamSkinManager
 {
@@ -44,7 +44,15 @@ namespace CodexDreamSkinManager
 
       Application.EnableVisualStyles();
       Application.SetCompatibleTextRenderingDefault(false);
-      Application.Run(new MainForm(screenshotPath));
+      MainForm form = new MainForm(screenshotPath);
+      if (!string.IsNullOrEmpty(screenshotPath) && args.Length >= 4)
+      {
+        int width;
+        int height;
+        if (int.TryParse(args[2], out width) && int.TryParse(args[3], out height))
+          form.ClientSize = new System.Drawing.Size(Math.Max(1000, width), Math.Max(700, height));
+      }
+      Application.Run(form);
       return 0;
     }
   }

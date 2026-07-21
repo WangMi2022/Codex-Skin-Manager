@@ -68,16 +68,26 @@ namespace CodexDreamSkinManager
         var store = new SkinStore(engineRoot, Path.Combine(temporary, "state"));
         store.EnsureBundledSkins();
         var initialSkins = store.LoadSkins();
+        string[] bundledSkinIds = SkinStore.GetBundledSkinIds(engineRoot);
         SkinRecord builtIn = initialSkins.Find(delegate(SkinRecord item) { return item.Manifest.id == SkinStore.BuiltInSkinId; });
-        SkinRecord coral = initialSkins.Find(delegate(SkinRecord item) { return item.Manifest.id == "coral-haze"; });
         SkinRecord violet = initialSkins.Find(delegate(SkinRecord item) { return item.Manifest.id == "violet-riviera"; });
         SkinRecord lilac = initialSkins.Find(delegate(SkinRecord item) { return item.Manifest.id == "lilac-salon"; });
-        if (initialSkins.Count != 4 || Path.GetFileName(store.SkinsRoot) != "skin" || store.GetActiveSkinId() != SkinStore.BuiltInSkinId ||
+        SkinRecord awesome = initialSkins.Find(delegate(SkinRecord item) { return item.Manifest.id == "guts-terminal"; });
+        if (bundledSkinIds.Length != 29 || initialSkins.Count != bundledSkinIds.Length ||
+          Path.GetFileName(store.SkinsRoot) != "skin" || store.GetActiveSkinId() != SkinStore.BuiltInSkinId ||
           builtIn == null || builtIn.Manifest.name != "玫瑰轻纱" || builtIn.Manifest.version != "1.1.0" ||
-          builtIn.Manifest.signature != "Rose Veil ♡" || coral == null || coral.Manifest.name != "晨雾珊瑚" ||
-          coral.Manifest.version != "1.0.0" || violet == null || violet.Manifest.name != "哈基米" ||
-          violet.Manifest.version != "1.3.8" || lilac == null || lilac.Manifest.name != "紫纱晴光")
+          builtIn.Manifest.signature != "Rose Veil ♡" || violet == null || violet.Manifest.name != "哈基米" ||
+          violet.Manifest.version != "1.3.8" || lilac == null || lilac.Manifest.name != "紫纱晴光" ||
+          awesome == null || awesome.Manifest.schemaVersion != 2 || !File.Exists(awesome.PreviewPath) ||
+          Path.GetExtension(awesome.PreviewPath).ToLowerInvariant() != ".png")
           throw new InvalidOperationException("Bundled skin bootstrap failed.");
+        string missingPreviewPath = awesome.PreviewPath;
+        File.Delete(missingPreviewPath);
+        store = new SkinStore(engineRoot, Path.Combine(temporary, "state"));
+        awesome = store.LoadSkins().Find(delegate(SkinRecord item) { return item.Manifest.id == "guts-terminal"; });
+        if (awesome == null || string.IsNullOrEmpty(awesome.PreviewPath) ||
+          Path.GetExtension(awesome.PreviewPath).ToLowerInvariant() != ".png" || !File.Exists(awesome.PreviewPath))
+          throw new InvalidOperationException("Existing schema v2 skin preview was not repaired.");
         if (!store.GetStarlightEnabled()) throw new InvalidOperationException("Starlight effects should be enabled by default.");
         store.SetStarlightEnabled(false);
         store.SetActiveSkin(SkinStore.BuiltInSkinId);
@@ -88,7 +98,8 @@ namespace CodexDreamSkinManager
         CreatePackage(validPackage, engineRoot, "manager-test", false);
         SkinRecord imported = store.ImportSkin(validPackage, false);
         store.SetActiveSkin(imported.Manifest.id);
-        if (store.LoadSkins().Count != 5 || store.GetActiveSkinId() != "manager-test") throw new InvalidOperationException("Skin import or activation failed.");
+        if (store.LoadSkins().Count != bundledSkinIds.Length + 1 || store.GetActiveSkinId() != "manager-test")
+          throw new InvalidOperationException("Skin import or activation failed.");
         imported = store.RenameSkin(imported, "Renamed Skin");
         if (imported.Manifest.name != "Renamed Skin" || store.GetActiveSkinId() != "manager-test" ||
           !ReadArchiveIndependentManifestName(Path.Combine(imported.DirectoryPath, "skin.json"), "Renamed Skin"))

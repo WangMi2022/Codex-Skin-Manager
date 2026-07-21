@@ -36,6 +36,17 @@ namespace CodexDreamSkinManager
     public string displayName { get; set; }
   }
 
+  internal sealed class BundledSkinCatalog
+  {
+    public int schemaVersion { get; set; }
+    public BundledSkinCatalogEntry[] skins { get; set; }
+  }
+
+  internal sealed class BundledSkinCatalogEntry
+  {
+    public string id { get; set; }
+  }
+
   public sealed class SkinRecord
   {
     public SkinManifest Manifest { get; set; }
@@ -53,7 +64,6 @@ namespace CodexDreamSkinManager
   public sealed class SkinStore
   {
     public const string BuiltInSkinId = "rose-garden";
-    public static readonly string[] BundledSkinIds = new string[] { "rose-garden", "coral-haze", "violet-riviera", "lilac-salon" };
     private const int MaxCssBytes = 2 * 1024 * 1024;
     private const int MaxArtBytes = 20 * 1024 * 1024;
     private const int MaxPreviewBytes = 20 * 1024 * 1024;
@@ -74,6 +84,7 @@ namespace CodexDreamSkinManager
     private readonly string skinsRoot;
     private readonly string activeConfigPath;
     private readonly string builtInPreferencesPath;
+    private bool bundledSkinsEnsured;
 
     public SkinStore(string engineRoot, string stateRoot)
     {
@@ -108,14 +119,47 @@ namespace CodexDreamSkinManager
       return Path.Combine(root, "bundled-skins", skinId);
     }
 
+    internal static string ResolveBundledCatalogPath(string root)
+    {
+      string development = Path.Combine(root, "skins", "bundled-skins.json");
+      if (File.Exists(development)) return development;
+      return Path.Combine(root, "bundled-skins", "catalog.json");
+    }
+
+    internal static string[] GetBundledSkinIds(string root)
+    {
+      string catalogPath = ResolveBundledCatalogPath(root);
+      BundledSkinCatalog catalog;
+      try { catalog = new JavaScriptSerializer().Deserialize<BundledSkinCatalog>(ReadUtf8(catalogPath, 256 * 1024)); }
+      catch (InvalidDataException) { throw; }
+      catch (Exception error) { throw new InvalidDataException("内置皮肤目录清单无效。", error); }
+      if (catalog == null || catalog.schemaVersion != 1 || catalog.skins == null || catalog.skins.Length == 0)
+        throw new InvalidDataException("内置皮肤目录清单无效。");
+
+      var ids = new List<string>();
+      var seen = new HashSet<string>(StringComparer.Ordinal);
+      foreach (BundledSkinCatalogEntry entry in catalog.skins)
+      {
+        string id = entry == null ? null : entry.id;
+        if (!IsValidSkinId(id) || !seen.Add(id)) throw new InvalidDataException("内置皮肤目录清单包含无效或重复 ID。");
+        ids.Add(id);
+      }
+      if (!seen.Contains(BuiltInSkinId)) throw new InvalidDataException("内置皮肤目录清单缺少默认皮肤。");
+      return ids.ToArray();
+    }
+
     internal static bool HasRequiredBundledSkinSources(string root)
     {
-      foreach (string skinId in BundledSkinIds)
+      string[] skinIds;
+      try { skinIds = GetBundledSkinIds(root); }
+      catch { return false; }
+      foreach (string skinId in skinIds)
       {
         string source = ResolveBundledSourceDirectory(root, skinId);
-        if (!File.Exists(Path.Combine(source, "skin.json")) ||
-          !File.Exists(Path.Combine(source, "dream-skin.css")) ||
-          !File.Exists(Path.Combine(source, "art.png"))) return false;
+        bool hasV1 = File.Exists(Path.Combine(source, "skin.json")) &&
+          File.Exists(Path.Combine(source, "dream-skin.css")) && File.Exists(Path.Combine(source, "art.png"));
+        bool hasV2 = File.Exists(Path.Combine(source, "theme.json"));
+        if (hasV1 == hasV2) return false;
       }
       return true;
     }
@@ -134,14 +178,20 @@ namespace CodexDreamSkinManager
 
     public void EnsureBundledSkins()
     {
+      if (bundledSkinsEnsured) return;
       EnsureBuiltInSkin();
-      foreach (string skinId in BundledSkinIds)
+      foreach (string skinId in GetBundledSkinIds(engineRoot))
       {
         if (string.Equals(skinId, BuiltInSkinId, StringComparison.Ordinal)) continue;
         string destination = GetSkinDirectory(skinId);
         if (Directory.Exists(destination))
         {
-          ValidateInstalledSkin(destination, skinId);
+          SkinManifest installed = ValidateInstalledSkin(destination, skinId);
+          if (installed.schemaVersion == 2 && !File.Exists(Path.Combine(destination, ".manager-preview.png")))
+          {
+            try { CreateThemeV2ManagerPreview(destination, installed); }
+            catch { /* A missing thumbnail must not hide an otherwise valid skin. */ }
+          }
           continue;
         }
 
@@ -150,12 +200,9 @@ namespace CodexDreamSkinManager
         Directory.CreateDirectory(stage);
         try
         {
-          CopyFile(Path.Combine(source, "skin.json"), Path.Combine(stage, "skin.json"));
-          CopyFile(Path.Combine(source, "dream-skin.css"), Path.Combine(stage, "dream-skin.css"));
-          CopyFile(Path.Combine(source, "art.png"), Path.Combine(stage, "art.png"));
-          string preview = Path.Combine(source, "preview.png");
-          CopyFile(File.Exists(preview) ? preview : Path.Combine(source, "art.png"), Path.Combine(stage, "preview.png"));
-          ValidateInstalledSkin(stage, skinId);
+          CopyDirectoryFiles(source, stage);
+          SkinManifest manifest = ValidateInstalledSkin(stage, skinId);
+          if (manifest.schemaVersion == 2) CreateThemeV2ManagerPreview(stage, manifest);
           try { Directory.Move(stage, destination); }
           catch (IOException)
           {
@@ -168,6 +215,7 @@ namespace CodexDreamSkinManager
         }
         ValidateInstalledSkin(destination, skinId);
       }
+      bundledSkinsEnsured = true;
     }
 
     public List<SkinRecord> LoadSkins()
@@ -551,36 +599,49 @@ namespace CodexDreamSkinManager
       {
         string converted = Path.Combine(directory, ".manager-preview.png");
         if (File.Exists(converted)) return converted;
-        try
-        {
-          Dictionary<string, object> raw = ParseJsonObject(ReadUtf8(Path.Combine(directory, "theme.json"), 256 * 1024), "theme.json");
-          string relative = GetThemeV2Preview(raw);
-          if (relative != null)
-          {
-            string preview = ResolveThemeV2File(directory, relative, "preview");
-            if (File.Exists(preview)) return preview;
-          }
-          object value;
-          Dictionary<string, object> assets;
-          if (raw.TryGetValue("assets", out value) && (assets = value as Dictionary<string, object>) != null)
-          {
-            foreach (object candidate in assets.Values)
-            {
-              string file = ResolveThemeV2File(directory, Convert.ToString(candidate), "asset");
-              if (File.Exists(file)) return file;
-            }
-          }
-        }
-        catch { }
-        return null;
+        string source = FindThemeV2PreviewSource(directory);
+        return IsGdiPreviewFile(source) ? source : null;
       }
       string v1Preview = Path.Combine(directory, "preview.png");
       return File.Exists(v1Preview) ? v1Preview : Path.Combine(directory, "art.png");
     }
 
+    private static string FindThemeV2PreviewSource(string directory)
+    {
+      try
+      {
+        Dictionary<string, object> raw = ParseJsonObject(ReadUtf8(Path.Combine(directory, "theme.json"), 256 * 1024), "theme.json");
+        string relative = GetThemeV2Preview(raw);
+        if (relative != null)
+        {
+          string preview = ResolveThemeV2File(directory, relative, "preview");
+          if (File.Exists(preview)) return preview;
+        }
+        object value;
+        Dictionary<string, object> assets;
+        if (raw.TryGetValue("assets", out value) && (assets = value as Dictionary<string, object>) != null)
+        {
+          foreach (object candidate in assets.Values)
+          {
+            string file = ResolveThemeV2File(directory, Convert.ToString(candidate), "asset");
+            if (File.Exists(file)) return file;
+          }
+        }
+      }
+      catch { }
+      return null;
+    }
+
+    private static bool IsGdiPreviewFile(string path)
+    {
+      if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
+      string extension = Path.GetExtension(path).ToLowerInvariant();
+      return extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".bmp" || extension == ".gif";
+    }
+
     private void CreateThemeV2ManagerPreview(string directory, SkinManifest manifest)
     {
-      string source = FindInstalledPreview(directory, manifest);
+      string source = FindThemeV2PreviewSource(directory);
       if (string.IsNullOrEmpty(source) || !File.Exists(source)) return;
       if (!string.Equals(Path.GetExtension(source), ".webp", StringComparison.OrdinalIgnoreCase)) return;
       string decoder = Path.Combine(engineRoot, "runtime", "webp", "dwebp.exe");
@@ -771,6 +832,24 @@ namespace CodexDreamSkinManager
     {
       if (!File.Exists(source)) throw new FileNotFoundException("引擎缺少内置皮肤文件。", source);
       File.Copy(source, destination, true);
+    }
+
+    private static void CopyDirectoryFiles(string source, string destination)
+    {
+      if (!Directory.Exists(source)) throw new DirectoryNotFoundException("引擎缺少内置皮肤目录：" + source);
+      string sourceRoot = Path.GetFullPath(source).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+      foreach (string directory in Directory.GetDirectories(source, "*", SearchOption.AllDirectories))
+      {
+        string relative = Path.GetFullPath(directory).Substring(sourceRoot.Length);
+        Directory.CreateDirectory(Path.Combine(destination, relative));
+      }
+      foreach (string file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+      {
+        string relative = Path.GetFullPath(file).Substring(sourceRoot.Length);
+        string target = Path.Combine(destination, relative);
+        Directory.CreateDirectory(Path.GetDirectoryName(target));
+        File.Copy(file, target, true);
+      }
     }
 
     private static void WriteBytes(string path, byte[] bytes)

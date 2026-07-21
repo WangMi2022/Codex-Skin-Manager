@@ -4,9 +4,9 @@
   const CHROME_ID = "codex-dream-skin-chrome";
   const WINDOWS_MENU_CLASS = "dream-windows-menu-bar";
   const WINDOWS_MENU_REGION_ATTR = "data-dream-menu-region";
+  const WINDOWS_MENU_COMMAND_GROUP_ATTR = "data-dream-menu-command-group";
   const ATTACHED_MAIN_CLASS = "dream-shell-attached-main";
   const ATTACHED_SIDEBAR_CLASS = "dream-shell-attached-sidebar";
-  const SHELL_SEAM_CLASS = "dream-shell-seam";
   window.__CODEX_DREAM_SKIN_DISABLED__ = false;
 
   const previous = window[STATE_KEY];
@@ -63,29 +63,12 @@ html.codex-dream-skin .dream-windows-menu-bar [data-dream-menu-region="main"] {
   color: var(--dream-windows-main-foreground) !important;
   -webkit-text-fill-color: var(--dream-windows-main-foreground) !important;
 }
-html.codex-dream-skin .dream-windows-menu-bar::after {
-  content: "";
-  position: absolute;
-  z-index: 20;
-  top: 0;
-  bottom: 0;
-  left: calc(var(--dream-windows-seam-x, -100px) - 5px);
-  width: 12px;
-  pointer-events: none;
-  background:
-    linear-gradient(
-      90deg,
-      rgba(250, 247, 239, .94) 0%,
-      rgba(250, 247, 239, .78) 44%,
-      rgba(250, 247, 239, .34) 72%,
-      rgba(250, 247, 239, 0) 100%
-    ) !important;
+html.codex-dream-skin .dream-windows-menu-bar [data-dream-menu-command-group] {
+  transform: translate3d(var(--dream-windows-menu-command-offset, 0px), 0, 0) !important;
 }
-html.codex-dream-skin .dream-windows-menu-bar + * > [role="separator"],
-html.codex-dream-skin .dream-windows-menu-bar + * > [data-panel-resize-handle-id] {
-  background: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
+html.codex-dream-skin .dream-windows-menu-bar [data-dream-menu-command-group] :is(button, [role=button])[aria-haspopup="menu"] {
+  padding-left: var(--dream-windows-menu-inline-padding, 10px) !important;
+  padding-right: var(--dream-windows-menu-inline-padding, 10px) !important;
 }
 html.codex-dream-skin aside.app-shell-left-panel.dream-shell-attached-main {
   border-top-right-radius: 0 !important;
@@ -97,29 +80,22 @@ html.codex-dream-skin #codex-dream-skin-chrome.dream-shell-attached-sidebar {
   border-top-left-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
 }
-html.codex-dream-skin #codex-dream-skin-chrome .dream-shell-seam {
-  position: absolute;
-  z-index: 3;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 10px;
-  pointer-events: none;
-  opacity: .96;
-  background:
-    linear-gradient(
-      90deg,
-      rgba(250, 247, 239, .96) 0%,
-      rgba(250, 247, 239, .76) 40%,
-      rgba(250, 247, 239, .38) 68%,
-      rgba(250, 247, 239, 0) 100%
-    ) !important;
-  box-shadow:
-    4px 0 14px rgba(250, 247, 239, .52),
-    -1px 0 rgba(255, 255, 255, .62);
+html.codex-dream-skin aside.app-shell-left-panel [class~="animate-spin"]:has(> svg[class~="icon-xs"]) {
+  color: var(--dream-violet, #70a9b4) !important;
+  opacity: .78 !important;
+  animation-duration: 1.65s !important;
 }
-html.codex-dream-skin #codex-dream-skin-chrome:not(.dream-shell-attached-sidebar) .dream-shell-seam {
-  display: none;
+html.codex-dream-skin aside.app-shell-left-panel [class~="animate-spin"]:has(> svg[class~="icon-xs"]) > svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+html.codex-dream-skin aside.app-shell-left-panel [class~="animate-spin"]:has(> svg[class~="icon-xs"]) > svg path[opacity] {
+  opacity: .16 !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.codex-dream-skin aside.app-shell-left-panel [class~="animate-spin"]:has(> svg[class~="icon-xs"]) {
+    animation: none !important;
+  }
 }
 `;
   const runtimeCssText = `${cssText}\n${effectCssText}`;
@@ -155,6 +131,9 @@ html.codex-dream-skin #codex-dream-skin-chrome:not(.dream-shell-attached-sidebar
     document.querySelectorAll(`[${WINDOWS_MENU_REGION_ATTR}]`).forEach((node) => {
       if (!eligible || !menu.contains(node)) node.removeAttribute(WINDOWS_MENU_REGION_ATTR);
     });
+    document.querySelectorAll(`[${WINDOWS_MENU_COMMAND_GROUP_ATTR}]`).forEach((node) => {
+      if (!eligible || !menu.contains(node)) node.removeAttribute(WINDOWS_MENU_COMMAND_GROUP_ATTR);
+    });
     document.querySelectorAll(`.${ATTACHED_MAIN_CLASS}`).forEach((node) => {
       if (!eligible || node !== sidebar) node.classList.remove(ATTACHED_MAIN_CLASS);
     });
@@ -166,7 +145,8 @@ html.codex-dream-skin #codex-dream-skin-chrome:not(.dream-shell-attached-sidebar
       for (const name of [
         "--dream-windows-menu-height", "--dream-windows-sidebar-padding-top",
         "--dream-windows-main-padding-top", "--dream-windows-sidebar-foreground",
-        "--dream-windows-main-foreground", "--dream-windows-seam-x",
+        "--dream-windows-main-foreground", "--dream-windows-menu-inline-padding",
+        "--dream-windows-menu-command-offset",
       ]) root?.style.removeProperty(name);
       return false;
     }
@@ -185,12 +165,54 @@ html.codex-dream-skin #codex-dream-skin-chrome:not(.dream-shell-attached-sidebar
 
     const sidebarBox = sidebar.getBoundingClientRect();
     const mainBox = main.getBoundingClientRect();
-    setRootVar("--dream-windows-seam-x", `${Math.round(sidebarBox.right - menuBox.left)}px`);
     const attached = sidebarBox.width > 1 && mainBox.width > 1 &&
       Math.abs(sidebarBox.right - mainBox.left) <= 2 &&
       Math.abs(sidebarBox.top - mainBox.top) <= 2;
     setClass(sidebar, ATTACHED_MAIN_CLASS, attached);
     setClass(main, ATTACHED_SIDEBAR_CLASS, attached);
+
+    const commandControls = [...menu.querySelectorAll(':is(button, [role=button])[aria-haspopup="menu"]')]
+      .filter((control) => {
+        const box = control.getBoundingClientRect();
+        return box.width > 0 && box.height > 0;
+      });
+    const commandGroup = commandControls[0]?.parentElement ?? null;
+    document.querySelectorAll(`[${WINDOWS_MENU_COMMAND_GROUP_ATTR}]`).forEach((node) => {
+      if (node !== commandGroup) node.removeAttribute(WINDOWS_MENU_COMMAND_GROUP_ATTR);
+    });
+    if (commandGroup && commandControls.every((control) => commandGroup.contains(control))) {
+      if (!commandGroup.hasAttribute(WINDOWS_MENU_COMMAND_GROUP_ATTR))
+        commandGroup.setAttribute(WINDOWS_MENU_COMMAND_GROUP_ATTR, "true");
+      const currentOffset = Number.parseFloat(root.style.getPropertyValue("--dream-windows-menu-command-offset")) || 0;
+      const metrics = commandControls.map((control) => {
+        const box = control.getBoundingClientRect();
+        const style = getComputedStyle(control);
+        return {
+          box,
+          intrinsic: Math.max(0, box.width - (Number.parseFloat(style.paddingLeft) || 0) -
+            (Number.parseFloat(style.paddingRight) || 0)),
+        };
+      });
+      const firstLeft = metrics[0].box.left - currentOffset;
+      const totalWidth = metrics.reduce((sum, metric) => sum + metric.box.width, 0);
+      const intrinsicWidth = metrics.reduce((sum, metric) => sum + metric.intrinsic, 0);
+      const interItemGap = Math.max(0,
+        metrics[metrics.length - 1].box.right - metrics[0].box.left - totalWidth);
+      const availablePadding = (sidebarBox.right - 8 - firstLeft - interItemGap - intrinsicWidth) /
+        (metrics.length * 2);
+      if (availablePadding >= 5) {
+        const padding = Math.floor(Math.min(10, availablePadding) * 2) / 2;
+        setRootVar("--dream-windows-menu-inline-padding", `${padding}px`);
+        setRootVar("--dream-windows-menu-command-offset", "0px");
+      } else {
+        setRootVar("--dream-windows-menu-inline-padding", "10px");
+        setRootVar("--dream-windows-menu-command-offset",
+          `${Math.max(0, Math.ceil(sidebarBox.right + 8 - firstLeft))}px`);
+      }
+    } else {
+      setRootVar("--dream-windows-menu-inline-padding", "10px");
+      setRootVar("--dream-windows-menu-command-offset", "0px");
+    }
 
     for (const control of menu.querySelectorAll("button, [role=button]")) {
       const box = control.getBoundingClientRect();
@@ -257,16 +279,12 @@ html.codex-dream-skin #codex-dream-skin-chrome:not(.dream-shell-attached-sidebar
       chrome.id = CHROME_ID;
       chrome.setAttribute("aria-hidden", "true");
       chrome.innerHTML = `
-        <div class="dream-shell-seam"></div>
         <div class="dream-brand"><span class="dream-note">✦</span><span><b></b><small></small></span></div>
         <div class="dream-signature"></div>
         <div class="dream-sparkles"><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="dream-ribbon"><span>♡</span>✦<span>♡</span></div>
         <div class="dream-polaroid"></div>`;
       document.body.appendChild(chrome);
-    }
-    if (!chrome.querySelector(`.${SHELL_SEAM_CLASS}`)) {
-      chrome.insertAdjacentHTML("afterbegin", `<div class="${SHELL_SEAM_CLASS}"></div>`);
     }
     chrome.querySelector(".dream-brand b").textContent = meta.brandName;
     chrome.querySelector(".dream-brand small").textContent = meta.brandSubtitle;
@@ -293,12 +311,14 @@ html.codex-dream-skin #codex-dream-skin-chrome:not(.dream-shell-attached-sidebar
     document.querySelectorAll(".dream-task-suggestion").forEach((node) => node.classList.remove("dream-task-suggestion"));
     document.querySelectorAll(`.${WINDOWS_MENU_CLASS}`).forEach((node) => node.classList.remove(WINDOWS_MENU_CLASS));
     document.querySelectorAll(`[${WINDOWS_MENU_REGION_ATTR}]`).forEach((node) => node.removeAttribute(WINDOWS_MENU_REGION_ATTR));
+    document.querySelectorAll(`[${WINDOWS_MENU_COMMAND_GROUP_ATTR}]`).forEach((node) => node.removeAttribute(WINDOWS_MENU_COMMAND_GROUP_ATTR));
     document.querySelectorAll(`.${ATTACHED_MAIN_CLASS}`).forEach((node) => node.classList.remove(ATTACHED_MAIN_CLASS));
     document.querySelectorAll(`.${ATTACHED_SIDEBAR_CLASS}`).forEach((node) => node.classList.remove(ATTACHED_SIDEBAR_CLASS));
     for (const name of [
       "--dream-windows-menu-height", "--dream-windows-sidebar-padding-top",
       "--dream-windows-main-padding-top", "--dream-windows-sidebar-foreground",
-      "--dream-windows-main-foreground", "--dream-windows-seam-x",
+      "--dream-windows-main-foreground", "--dream-windows-menu-inline-padding",
+      "--dream-windows-menu-command-offset",
     ]) document.documentElement?.style.removeProperty(name);
     document.getElementById(STYLE_ID)?.remove();
     document.getElementById(CHROME_ID)?.remove();

@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 1,
+  "source": "https://github.com/Wangnov/awesome-codex-skins",
+  "releaseTag": "skins-v1.1.0",
+  "publishedAt": "2026-07-17T01:38:02.0000000Z",
+  "skins": [
+    {
+      "id": "rose-garden",
+      "source": "local"
+    },
+    {
+      "id": "violet-riviera",
+      "source": "local"
+    },
+    {
+      "id": "lilac-salon",
+      "source": "local"
+    },
+    {
+      "id": "asuka-eva02",
+      "source": "awesome-codex-skins",
+      "version": "1.0.0",
+      "package": "asuka-eva02-1.0.0.codexskin",
+      "sha256": "2521b9cbdc54cedbf0e65cb1e097c7e68d44b2bd5f497d9a4dbbf349dd4cfe1b"
+    },
+    {
+      "id": "caishen-jubao",
+      "source": "awesome-codex-skins",
+      "version": "1.0.1",
+      "package": "caishen-jubao-1.0.1.codexskin",
+      "sha256": "466df3f5c3dddb107768a9fa965c6f1f1cf506bf5f8cbfedd22327da42c73688"
+    },
+    {
+      "id": "celestial-court",
+      "source": "awesome-codex-skins",
+      "version": "1.0.1",
+      "package": "celestial-court-1.0.1.codexskin",
+      "sha256": "06b37179c4f6fe97129e825dfbdaf24467e511dc208f61120af6407d7b1e0d6d"
+    },
+    {
+      "id": "dilraba-starlight",
+      "source": "awesome-codex-skins",
+      "version": "1.0.0",
+      "package": "dilraba-starlight-1.0.0.codexskin",
+      "sha256": "e8b928c9f1a12ff41cd201b6b45b0613e6350612feec37032b224d853a7fc6ed"
+    },
+    {
+      "id": "elon-mars-protocol",
+      "source": "awesome-codex-skins",
+      "version": "1.0.0",
+      "package": "elon-mars-protocol-1.0.0.codexskin",
+      "sha256": "eb1b0df6a56f2e23ef8fb49417950e17eeab9053dcf10165a010b4e07ba6e8c5"
+    },
+    {
+      "id": "emilia-rezero",
+      "source": "awesome-codex-skins",
+      "version": "1.0.1",
+      "package": "emilia-rezero-1.0.1.codexskin",
+      "sha256": "f04d1f9d354bff1c6e50c02d4bdf58f74f5107decfd410e21fba6c50184a05c3"
+    },
+    {
+      "id": "guts-terminal",
+      "source": "awesome-codex-skins",
+      "version": "1.0.0",
+      "package": "guts-terminal-1.0.0.codexskin",
+      "sha256": "71ed2bbf14b26b85bb6e813bfe26bf117d33f82cef31310197fc5fa43049c27e"
+    },
+    {
+      "id": "hancock-onepiece",
+      "source": "awesome-codex-skins",
+      "version": "1.0.1",
+      "package": "hancock-onepiece-1.0.1.codexskin",
+      "sha256": "b2ec29d582fcdf2f4ec4adbd366ba5e273bdf4023051205182d3ceaee9cae1eb"
+    },
+    {
+      "id": "jay-chou-inkstone-rhapsody",
+      "source": "awesome-codex-skins",
+      "version": "1.0.0",
+      "package": "jay-chou-inkstone-rhapsody-1.0.0.codexskin",
+      "sha256": "40839e4b4b3dfa7b31a6cbdc694d692434561423f34cbef96b8f60a0d44bcb68"
+    },
+    {
+      "id": "jensen-infinite-compute",
+      "source": "awesome-codex-skins",
+      "version": "1.0.0",
+      "package": "jensen-infinite-compute-1.0.0.codexskin",
+      "sha256": "81d0fb6569d25b198d5bda01c28d46cff3d0d742ba4148bb40f8b359453b7756"
+    },
+    {
+      "id": "jj-lin-soulwave-sanctuary",
+      "source": "awesome-codex-skins",
+      "version": "1.0.0",
+      "package": "jj-lin-soulwave-sanctuary-1.0.0.codexskin",
+      "sha256": "29a486a429f81a468e00b95a1812c83f9cf9c85c64904f64ce23085ea1a901e7"
+    },
+    {
+      "id": "journey-to-west",
+      "source": "awesome-codex-skins",
+      "version": "1.0.1",
+      "package": "journey-to-west-1.0.1.codexskin",
+      "sha256": "13f639ee8ab235771b1753ca94ec17782ec48ef9139ba2104b488ed5f57bd385"
+    },
+    {
+      "id": "kakashi-naruto",
+      "source": "awesome-codex-skins",
+      "version": "1.0.1",
+      "package": "kakashi-naruto-1.0.1.codexskin",
+      "sha256": "5a93ce2fef13cd1382a233f82a03b533b96576c56e04adc99ef30abf4a0b643b"
+    },
+    {
+      "id": "kaworu-mark06",
+      "source": "awesome-codex-skins",
+      "version": "1.0.0",
+      "package": "kaworu-mark06-1.0.0.codexskin",
+      "sha256": "95e1295abaa0cb577fea66c5c287bf43bbe9b8ffed6a3931f7aa52c4981c965c"
+    },
+    {
+      "id": "kun-afterglow",
+      "source": "awesome-codex-skins",
+      "version": "1.0.0",
+      "package": "kun-afterglow-1.0.0.codexskin",
+      "sha256": "cb6d3b15edb8b10934ce4e57302152cde8f05e4007da8470a66f65e07b07af7b"
+    },
+    {
+      "id": "luffy-onepiece",
+      "source": "awesome-codex-skins",
+      "version": "1.0.1",
+      "package": "luffy-onepiece-1.0.1.codexskin",
+      "sha256": "5cb62e4a506cb673c618bffe0b264c1ed79523bb3430b937738f59079f547a49"
+    },
+    {
+      "id": "mai-shiranui",
+      "source": "awesome-codex-skins",
+      "version": "1.0.1",
+      "package": "mai-shiranui-1.0.1.codexskin",
+      "sha256": "916c8baab8b96d2754e2e89112ff3fd4f0a1f88b8f34be818d1a2d3f084c9b83"
+    },
+    {
+      "id": "ming-imperial",
+      "source": "awesome-codex-skins",
+      "version": "1.0.1",
+      "package": "ming-imperial-1.0.1.codexskin",
+      "sha256": "3077a7ffc41d13dc6dbe37aae91fb9777081f7b435ad0b7d6722997024bc8f0d"
+    },
+    {
+      "id": "rei-eva00",
+      "source": "awesome-codex-skins",
+      "version": "1.0.0",
+      "package": "rei-eva00-1.0.0.codexskin",
+      "sha256": "f0d08a927c1832370c0fde8e126dde9a4e2bc8545a82ece4fb5312fc0236640d"
+    },
+    {
+      "id": "rem-rezero",
+      "source": "awesome-codex-skins",
+      "version": "1.0.0",
+      "package": "rem-rezero-1.0.0.codexskin",
+      "sha256": "8f806bdd8c9b9eaf500cedada3e056fde98b4e1a3df5b027f98dee13c8a372ec"
+    },
+    {
+      "id": "san-tibo",
+      "source": "awesome-codex-skins",
+      "version": "1.0.0",
+      "package": "san-tibo-1.0.0.codexskin",
+      "sha256": "1a3ccdf390d3d8949468859b0d1e2cfb8180e98d588a013febc52fa98933c32b"
+    },
+    {
+      "id": "shinji-eva01",
+      "source": "awesome-codex-skins",
+      "version": "1.0.0",
+      "package": "shinji-eva01-1.0.0.codexskin",
+      "sha256": "a31866ae3303e45274aefc33b8d781790658136fdb6af0b80b4c8ed87fc36c07"
+    },
+    {
+      "id": "three-kingdoms",
+      "source": "awesome-codex-skins",
+      "version": "1.0.1",
+      "package": "three-kingdoms-1.0.1.codexskin",
+      "sha256": "02c734edc51b1aec1067eca597f6f98820543a4893cae4f365a770ecab4653fd"
+    },
+    {
+      "id": "trump-golden-order",
+      "source": "awesome-codex-skins",
+      "version": "1.0.0",
+      "package": "trump-golden-order-1.0.0.codexskin",
+      "sha256": "8f26213fe6703bf0e74171f5d4ed376c43589f4dbae3c836cedf590183fd7ffb"
+    },
+    {
+      "id": "underworld-yama",
+      "source": "awesome-codex-skins",
+      "version": "1.0.1",
+      "package": "underworld-yama-1.0.1.codexskin",
+      "sha256": "17450c7267f90139870951e503566ed8867925b9ba49549d2ca4db29dfac83fe"
+    },
+    {
+      "id": "western-pure-land",
+      "source": "awesome-codex-skins",
+      "version": "1.0.1",
+      "package": "western-pure-land-1.0.1.codexskin",
+      "sha256": "e02dfc145831566c39e0ba9d6ae4b79885380756b402c2ec85e6510432544622"
+    }
+  ]
+}

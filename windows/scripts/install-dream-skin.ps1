@@ -35,7 +35,17 @@ try {
   New-Item -ItemType Directory -Force -Path $StateRoot | Out-Null
   $SkinsRoot = Join-Path $StateRoot 'skins'
   $BuiltInSkinId = 'rose-garden'
-  $BundledSkinIds = @($BuiltInSkinId, 'coral-haze', 'violet-riviera', 'lilac-salon')
+  $catalogCandidates = @(
+    (Join-Path $SkillRoot 'skins\bundled-skins.json'),
+    (Join-Path $SkillRoot 'bundled-skins\catalog.json')
+  )
+  $catalogPath = $catalogCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+  if (-not $catalogPath) { throw 'Bundled skin catalog was not found.' }
+  $catalog = Get-Content -Raw -LiteralPath $catalogPath | ConvertFrom-Json
+  $BundledSkinIds = @($catalog.skins | ForEach-Object { [string]$_.id })
+  if ($catalog.schemaVersion -ne 1 -or $BundledSkinIds.Count -eq 0 -or $BundledSkinIds -notcontains $BuiltInSkinId) {
+    throw 'Bundled skin catalog is invalid.'
+  }
   foreach ($skinId in $BundledSkinIds) {
     $sourceCandidates = @(
       (Join-Path $SkillRoot "skins\$skinId"),
@@ -51,12 +61,13 @@ try {
     $shouldCopy = $skinId -eq $BuiltInSkinId -or -not (Test-Path -LiteralPath $destination -PathType Container)
     if (-not $shouldCopy) { continue }
     New-Item -ItemType Directory -Force -Path $destination | Out-Null
-    foreach ($name in @('skin.json', 'dream-skin.css', 'art.png')) {
-      Copy-Item -LiteralPath (Join-Path $sourceRoot $name) -Destination (Join-Path $destination $name) -Force
+    $sourceFull = [System.IO.Path]::GetFullPath($sourceRoot).TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+    foreach ($file in Get-ChildItem -LiteralPath $sourceRoot -File -Recurse) {
+      $relative = $file.FullName.Substring($sourceFull.Length)
+      $target = Join-Path $destination $relative
+      New-Item -ItemType Directory -Force -Path ([System.IO.Path]::GetDirectoryName($target)) | Out-Null
+      Copy-Item -LiteralPath $file.FullName -Destination $target -Force
     }
-    $preview = Join-Path $sourceRoot 'preview.png'
-    if (-not (Test-Path -LiteralPath $preview -PathType Leaf)) { $preview = Join-Path $sourceRoot 'art.png' }
-    Copy-Item -LiteralPath $preview -Destination (Join-Path $destination 'preview.png') -Force
   }
   $ActiveSkinPath = Join-Path $StateRoot 'active-skin.json'
   if (-not (Test-Path -LiteralPath $ActiveSkinPath -PathType Leaf)) {

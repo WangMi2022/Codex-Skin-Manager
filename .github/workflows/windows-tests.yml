@@ -1,0 +1,19 @@
+name: Windows tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Windows regression tests
+        shell: pwsh
+        run: .\windows\tests\run-tests.ps1
+

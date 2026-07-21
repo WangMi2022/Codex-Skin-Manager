@@ -419,7 +419,9 @@ async function loadPayload(options) {
   const source = await loadSkinSource(options);
   if (source.format === "awesome-v2") {
     const manifest = await assertSafeThemeV2(source.directory, source.expectedId);
-    const result = await buildThemeV2Payload(source.directory);
+    const result = await buildThemeV2Payload(source.directory, {
+      starlightEnabled: source.starlightEnabled !== false,
+    });
     if (result.theme?.id !== source.expectedId) throw new Error("Theme v2 payload ID does not match the active skin");
     return {
       payload: result.payload,
@@ -580,16 +582,25 @@ async function verifySession(session, format) {
       const node = document.querySelector(selector);
       return !node || getComputedStyle(node).display === 'none';
     });
-    let projectPicker = null;
-    if (home) {
-      projectPicker = [...home.querySelectorAll('div')].find((node) =>
-        node.querySelector(':scope > .horizontal-scroll-fade-mask .group\\\\/project-selector')) ?? null;
-    }
     const sidebarNode = document.querySelector('aside.app-shell-left-panel');
     const mainSurfaceNode = document.querySelector('main.main-surface');
     const chromeNode = document.getElementById('codex-dream-skin-chrome');
     const composerNode = document.querySelector('.composer-surface-chrome');
     const windowsMenuNode = document.querySelector('.app-header-tint[class~="group/application-menu-top-bar"]');
+    const windowsMenuSeam = (() => {
+      if (!windowsMenuNode || !sidebarNode) return { clearance: null, pass: true };
+      const boundary = sidebarNode.getBoundingClientRect().right;
+      const controls = [...windowsMenuNode.querySelectorAll(':is(button, [role=button])[aria-haspopup="menu"]')]
+        .map((node) => node.getBoundingClientRect())
+        .filter((rect) => rect.width > 0 && rect.height > 0);
+      if (controls.length === 0) return { clearance: null, pass: true };
+      const clearance = Math.min(...controls.map((rect) => {
+        if (boundary > rect.left && boundary < rect.right)
+          return -Math.min(boundary - rect.left, rect.right - boundary);
+        return Math.min(Math.abs(boundary - rect.left), Math.abs(boundary - rect.right));
+      }));
+      return { clearance: Math.round(clearance * 10) / 10, pass: clearance >= 8 };
+    })();
     const result = {
       installed: document.documentElement.classList.contains('codex-dream-skin'),
       version: window.__CODEX_DREAM_SKIN_STATE__?.version ?? null,
@@ -601,6 +612,8 @@ async function verifySession(session, format) {
       chromePresent: Boolean(document.getElementById('codex-dream-skin-chrome')),
       chromePointerEvents: getComputedStyle(chromeNode || document.body).pointerEvents,
       windowsMenuIntegrated: !windowsMenuNode || windowsMenuNode.classList.contains('dream-windows-menu-bar'),
+      windowsMenuSeamClearance: windowsMenuSeam.clearance,
+      windowsMenuSeamPass: windowsMenuSeam.pass,
       shellAttached: Boolean(sidebarNode?.classList.contains('dream-shell-attached-main') &&
         mainSurfaceNode?.classList.contains('dream-shell-attached-sidebar')),
       homePresent: Boolean(home),
@@ -611,7 +624,6 @@ async function verifySession(session, format) {
       taskCards: taskCards.map(box),
       taskColumns,
       taskDecorationsHidden,
-      projectPicker: box(projectPicker),
       composer: box(composerNode),
       sidebar: box(sidebarNode),
       mainSurface: box(mainSurfaceNode),
@@ -630,10 +642,6 @@ async function verifySession(session, format) {
     result.taskGap = result.taskCards.length > 0 && result.hero
       ? result.taskCards[0].y - (result.hero.y + result.hero.height)
       : null;
-    result.projectPickerGap = result.projectPicker && result.composer
-      ? result.composer.y - (result.projectPicker.y + result.projectPicker.height)
-      : null;
-    result.projectPickerPass = !result.projectPicker || !result.composer || result.projectPickerGap >= 8;
     result.shellSeamPass = !result.shellAttached || Boolean(result.sidebar && result.mainSurface &&
       Math.abs(result.sidebar.x + result.sidebar.width - result.mainSurface.x) <= 2 &&
       Math.abs(result.sidebar.y - result.mainSurface.y) <= 2);
@@ -647,9 +655,8 @@ async function verifySession(session, format) {
       everyCornerAtLeast(result.roundedCorners.composer, 20);
     result.pass = result.installed && result.version === result.expectedVersion &&
       Boolean(result.skinId) && result.skinId === result.documentSkinId &&
-      result.stylePresent && result.chromePresent && result.windowsMenuIntegrated && result.shellSeamPass &&
-      result.chromePointerEvents === 'none' && Boolean(result.composer) && Boolean(result.sidebar) &&
-      result.roundedShellPass && result.projectPickerPass &&
+      result.stylePresent && result.chromePresent && result.windowsMenuIntegrated && result.windowsMenuSeamPass && result.shellSeamPass &&
+      result.chromePointerEvents === 'none' && Boolean(result.composer) && Boolean(result.sidebar) && result.roundedShellPass &&
       (!result.homePresent || (Boolean(result.hero) &&
         (!result.suggestionsPresent || (result.cards.length >= 2 && result.cards.length <= 4)))) &&
       (result.taskCards.length === 0 || (result.taskColumns >= 2 &&
@@ -889,7 +896,7 @@ if (options.mode === "self-test") {
 } else if (options.mode === "check-payload") {
   const { payload, skin, format, assetCount } = await loadPayload(options);
   const unresolved = format === "awesome-v2"
-    ? ["__CTS_CSS_JSON__", "__CTS_THEME_JSON__", "__CTS_CHROME_JSON__", "__CTS_MOTION_JSON__"]
+    ? ["__CTS_CSS_JSON__", "__CTS_THEME_JSON__", "__CTS_CHROME_JSON__", "__CTS_MOTION_JSON__", "__CTS_STARLIGHT_JSON__"]
     : ["__DREAM_CSS_JSON__", "__DREAM_ART_JSON__", "__DREAM_META_JSON__"];
   if (unresolved.some((marker) => payload.includes(marker))) throw new Error("Payload placeholders were not fully replaced");
   console.log(JSON.stringify({ pass: true, version: SKIN_VERSION, skinId: skin.id,

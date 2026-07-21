@@ -38,8 +38,9 @@ html.codex-theme-studio [data-cts-composer-overflow="editor"] {
 }
 `;
 
-export async function buildPayload(themeDir) {
+export async function buildPayload(themeDir, runtimeOptions = {}) {
   const theme = await loadTheme(themeDir);
+  const starlightEnabled = runtimeOptions.starlightEnabled !== false;
   const [template, dataUrls] = await Promise.all([
     fs.readFile(RUNTIME_TEMPLATE, "utf8"),
     inlineAssets(theme),
@@ -67,6 +68,7 @@ export async function buildPayload(themeDir) {
     .update(cssWithAssets).update(theme.chromeHtml ?? "")
     .update(JSON.stringify(theme.config))
     .update(JSON.stringify(motionDataUrls))
+    .update(JSON.stringify(starlightEnabled))
     .digest("hex").slice(0, 12);
   const payload = template
     .replace("__CTS_CREATE_COMPOSER_OVERFLOW_ANNOTATOR__", () => COMPOSER_ANNOTATOR_SOURCE)
@@ -75,6 +77,7 @@ export async function buildPayload(themeDir) {
     .replace("__CTS_THEME_JSON__", () => JSON.stringify(theme.config))
     .replace("__CTS_CHROME_JSON__", () => JSON.stringify(theme.chromeHtml))
     .replace("__CTS_MOTION_JSON__", () => JSON.stringify(motionDataUrls))
+    .replace("__CTS_STARLIGHT_JSON__", () => JSON.stringify(starlightEnabled))
     .replace("__CTS_VERSION_JSON__", () => JSON.stringify(STUDIO_VERSION))
     .replace("__CTS_STAMP_JSON__", () => JSON.stringify(`${STUDIO_VERSION}:${theme.config.id}:${stamp}`));
   return {
@@ -92,6 +95,7 @@ export const REMOVE_EXPRESSION = `(() => {
   document.documentElement?.classList.remove('codex-theme-studio');
   document.documentElement?.removeAttribute('data-cts-theme');
   document.documentElement?.removeAttribute('data-cts-shell');
+  document.documentElement?.removeAttribute('data-cts-motion');
   document.querySelectorAll('.cts-windows-menu-bar').forEach((node) => node.classList.remove('cts-windows-menu-bar'));
   document.querySelectorAll('[data-cts-menu-region]').forEach((node) => node.removeAttribute('data-cts-menu-region'));
   document.querySelectorAll('[data-cts-composer-overflow]').forEach((node) => node.removeAttribute('data-cts-composer-overflow'));
@@ -104,6 +108,7 @@ export const REMOVE_EXPRESSION = `(() => {
   document.getElementById('cts-style')?.remove();
   document.getElementById('cts-chrome')?.remove();
   document.getElementById('cts-stage')?.remove();
+  document.getElementById('cts-starlight')?.remove();
   document.getElementById('cts-intro')?.remove();
   delete window.__CODEX_THEME_STUDIO__;
   return true;
@@ -116,6 +121,7 @@ export const VERIFY_REMOVED_EXPRESSION = `(() =>
   !document.querySelector('[data-cts-composer-overflow]') &&
   !document.querySelector('[data-cts-composer-mode]') &&
   !document.documentElement.style.getPropertyValue('--cts-windows-menu-height') &&
+  !document.documentElement.hasAttribute('data-cts-motion') &&
   !document.documentElement.style.getPropertyValue('--cts-windows-sidebar-padding-top') &&
   !document.documentElement.style.getPropertyValue('--cts-windows-main-padding-top') &&
   !document.documentElement.style.getPropertyValue('--cts-windows-sidebar-foreground') &&
@@ -188,7 +194,23 @@ export function verifyExpression(expectedVersion = STUDIO_VERSION) {
           composerOverflow.editorCount === 1 &&
           composerOverflow.editorOverflowY === 'auto';
     }
-    const sidebar = box(document.querySelector('aside.app-shell-left-panel'));
+    const sidebarNode = document.querySelector('aside.app-shell-left-panel');
+    const sidebar = box(sidebarNode);
+    const windowsMenuNode = document.querySelector('.app-header-tint[class~="group/application-menu-top-bar"]');
+    const windowsMenuSeam = (() => {
+      if (!windowsMenuNode || !sidebarNode) return { clearance: null, pass: true };
+      const boundary = sidebarNode.getBoundingClientRect().right;
+      const controls = [...windowsMenuNode.querySelectorAll(':is(button, [role=button])[aria-haspopup="menu"]')]
+        .map((node) => node.getBoundingClientRect())
+        .filter((rect) => rect.width > 0 && rect.height > 0);
+      if (controls.length === 0) return { clearance: null, pass: true };
+      const clearance = Math.min(...controls.map((rect) => {
+        if (boundary > rect.left && boundary < rect.right)
+          return -Math.min(boundary - rect.left, rect.right - boundary);
+        return Math.min(Math.abs(boundary - rect.left), Math.abs(boundary - rect.right));
+      }));
+      return { clearance: Math.round(clearance * 10) / 10, pass: clearance >= 8 };
+    })();
     const result = {
       installed: document.documentElement.classList.contains('codex-theme-studio'),
       themeId: document.documentElement.getAttribute('data-cts-theme'),
@@ -198,9 +220,13 @@ export function verifyExpression(expectedVersion = STUDIO_VERSION) {
       stylePresent: Boolean(document.getElementById('cts-style')),
       chromePresent: Boolean(chrome),
       chromePointerEvents: chrome ? getComputedStyle(chrome).pointerEvents : null,
+      starlightEnabled: state?.starlightEnabled ?? false,
+      starlightPresent: Boolean(document.getElementById('cts-starlight')),
       composer,
       composerOverflow,
       sidebar,
+      windowsMenuSeamClearance: windowsMenuSeam.clearance,
+      windowsMenuSeamPass: windowsMenuSeam.pass,
       viewport: { width: innerWidth, height: innerHeight },
       documentOverflow: {
         x: document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -220,6 +246,7 @@ export function verifyExpression(expectedVersion = STUDIO_VERSION) {
       result.composerOverflow?.modeValid === true &&
       result.composerOverflow?.editorValid === true &&
       Boolean(result.sidebar?.visible) &&
+      result.windowsMenuSeamPass === true &&
       !result.documentOverflow.x
     );
     return result;

@@ -56,6 +56,7 @@ namespace CodexDreamSkinManager
     private PillLabel activeLabel;
     private PillLabel libraryCountLabel;
     private PillLabel codexStatusLabel;
+    private Label starlightStatusLabel;
     private ToolStripStatusLabel statusLabel;
     private Timer codexStatusTimer;
     private Button importButton;
@@ -65,17 +66,18 @@ namespace CodexDreamSkinManager
     private Button folderButton;
     private Button deleteButton;
     private Button restoreButton;
-    private DreamToggle headerStarlightToggle;
+    private DreamToggle starlightToggle;
     private SplitContainer mainSplit;
     private bool busy;
     private bool updatingStarlightToggle;
+    private bool? lastCodexRunning;
 
     public MainForm(string screenshotPath)
     {
       this.screenshotPath = screenshotPath;
       Text = "Codex皮肤主题管理器";
       try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
-      Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Regular, GraphicsUnit.Point);
+      Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point);
       BackColor = Canvas;
       ForeColor = Ink;
       StartPosition = FormStartPosition.CenterScreen;
@@ -90,8 +92,9 @@ namespace CodexDreamSkinManager
       DragDrop += OnDragDrop;
       Shown += OnShown;
       KeyDown += OnKeyDown;
+      Resize += delegate { AdjustSplitForWindow(false); };
       InitializeEngine();
-      codexStatusTimer = new Timer { Interval = 3000 };
+      codexStatusTimer = new Timer { Interval = 6000 };
       codexStatusTimer.Tick += delegate { RefreshCodexStatusIndicator(); };
       codexStatusTimer.Start();
     }
@@ -133,45 +136,55 @@ namespace CodexDreamSkinManager
         TextColor = Muted,
         Size = new Size(108, 26)
       };
-      RoundedPanel headerEffectPanel = new RoundedPanel
+      RoundedPanel starlightPanel = new RoundedPanel
       {
-        BackColor = Color.FromArgb(255, 249, 245),
-        BorderColor = Color.FromArgb(232, 214, 204),
-        Radius = 18,
-        Size = new Size(178, 46),
-        Anchor = AnchorStyles.Top | AnchorStyles.Right
+        BackColor = Color.FromArgb(255, 251, 247),
+        BorderColor = Color.FromArgb(224, 205, 195),
+        Radius = 13,
+        Size = new Size(220, 54)
       };
-      Label headerEffectLabel = new Label
+      Label starlightIcon = new Label
+      {
+        AutoSize = false,
+        Text = "✦",
+        TextAlign = ContentAlignment.MiddleCenter,
+        Font = new Font("Segoe UI Symbol", 14F, FontStyle.Bold),
+        ForeColor = Coral,
+        BackColor = Color.Transparent,
+        Location = new Point(10, 8),
+        Size = new Size(30, 38)
+      };
+      Label starlightTitle = new Label
       {
         AutoSize = true,
-        Text = "星光动态",
-        Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold),
+        Text = "动态特效",
+        Font = new Font("Segoe UI", 9.2F, FontStyle.Bold),
         ForeColor = Ink,
         BackColor = Color.Transparent,
-        Location = new Point(16, 7)
+        Location = new Point(43, 8)
       };
-      Label headerEffectHint = new Label
+      starlightStatusLabel = new Label
       {
         AutoSize = true,
-        Text = "会话背景特效",
-        Font = new Font("Microsoft YaHei UI", 7.8F),
-        ForeColor = Muted,
+        Text = "星光已开启",
+        Font = new Font("Segoe UI", 8F),
+        ForeColor = Teal,
         BackColor = Color.Transparent,
-        Location = new Point(17, 26)
+        Location = new Point(43, 29)
       };
-      headerStarlightToggle = new DreamToggle
+      starlightToggle = new DreamToggle
       {
         Checked = true,
-        Location = new Point(105, 7),
-        Size = new Size(58, 32),
-        Anchor = AnchorStyles.Top | AnchorStyles.Right,
-        AccessibleName = "顶部星光动态特效开关",
-        AccessibleDescription = "打开或关闭会话背景中的动态星光特效"
+        Location = new Point(145, 11),
+        Size = new Size(62, 32),
+        AccessibleName = "动态特效总开关",
+        AccessibleDescription = "打开或关闭所有皮肤中的星光动态特效"
       };
-      headerStarlightToggle.CheckedChanged += OnStarlightToggleChanged;
-      headerEffectPanel.Controls.Add(headerEffectLabel);
-      headerEffectPanel.Controls.Add(headerEffectHint);
-      headerEffectPanel.Controls.Add(headerStarlightToggle);
+      starlightToggle.CheckedChanged += OnStarlightToggleChanged;
+      starlightPanel.Controls.Add(starlightIcon);
+      starlightPanel.Controls.Add(starlightTitle);
+      starlightPanel.Controls.Add(starlightStatusLabel);
+      starlightPanel.Controls.Add(starlightToggle);
       importButton = CreateButton("导入皮肤", true, 136);
       importButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
       importButton.Location = new Point(20, 31);
@@ -180,15 +193,16 @@ namespace CodexDreamSkinManager
       header.Controls.Add(appTitle);
       header.Controls.Add(appSubtitle);
       header.Controls.Add(codexStatusLabel);
-      header.Controls.Add(headerEffectPanel);
+      header.Controls.Add(starlightPanel);
       header.Controls.Add(importHint);
       header.Controls.Add(importButton);
       header.Resize += delegate
       {
         importButton.Location = new Point(Math.Max(20, header.ClientSize.Width - importButton.Width - 30), 31);
-        headerEffectPanel.Location = new Point(Math.Max(430, importButton.Left - headerEffectPanel.Width - 18), 31);
-        importHint.Location = new Point(Math.Max(360, headerEffectPanel.Left - importHint.Width - 18), 45);
-        codexStatusLabel.Location = new Point(Math.Max(430, importHint.Left - codexStatusLabel.Width - 16), 36);
+        importHint.Location = new Point(importButton.Left + Math.Max(0, (importButton.Width - importHint.Width) / 2), 78);
+        starlightPanel.Location = new Point(Math.Max(470, importButton.Left - starlightPanel.Width - 16), 27);
+        codexStatusLabel.Visible = header.ClientSize.Width >= 1100;
+        codexStatusLabel.Location = new Point(Math.Max(350, starlightPanel.Left - codexStatusLabel.Width - 14), 41);
       };
 
       statusLabel = new ToolStripStatusLabel
@@ -313,7 +327,7 @@ namespace CodexDreamSkinManager
     {
       Panel content = new Panel { Dock = DockStyle.Fill, Padding = new Padding(28, 24, 28, 18), BackColor = Canvas };
 
-      PreviewHost previewHost = new PreviewHost { Dock = DockStyle.Top, Height = 316, BackColor = Surface, Padding = new Padding(7) };
+      PreviewHost previewHost = new PreviewHost { Dock = DockStyle.Top, Height = 316, BackColor = Surface, Padding = new Padding(2) };
       preview = new PictureBox { Dock = DockStyle.Fill, BackColor = Color.FromArgb(239, 234, 228), SizeMode = PictureBoxSizeMode.Zoom };
       PillLabel previewTag = new PillLabel
       {
@@ -469,6 +483,8 @@ namespace CodexDreamSkinManager
 
     private static string ResolveStorageRoot(string engineRoot)
     {
+      string overrideRoot = Environment.GetEnvironmentVariable("CODEX_DREAM_SKIN_STATE_ROOT");
+      if (!string.IsNullOrWhiteSpace(overrideRoot)) return Path.GetFullPath(overrideRoot);
       if (string.Equals(Path.GetFileName(engineRoot.TrimEnd(Path.DirectorySeparatorChar)), ".codex-dream-skin", StringComparison.OrdinalIgnoreCase))
       {
         DirectoryInfo parent = Directory.GetParent(engineRoot);
@@ -480,8 +496,9 @@ namespace CodexDreamSkinManager
     private CodexClientStatus RefreshCodexStatusIndicator()
     {
       CodexClientStatus status = CodexClientDetector.Detect();
-      if (codexStatusLabel != null)
+      if (codexStatusLabel != null && (!lastCodexRunning.HasValue || lastCodexRunning.Value != status.IsRunning))
       {
+        lastCodexRunning = status.IsRunning;
         codexStatusLabel.Text = status.IsRunning ? "Codex 运行中" : "Codex 未运行";
         codexStatusLabel.FillColor = status.IsRunning
           ? Color.FromArgb(224, 238, 237)
@@ -527,7 +544,7 @@ namespace CodexDreamSkinManager
         activeLabel.Visible = false;
         SetActionAvailability(false);
         ReplacePreview(null);
-        if (headerStarlightToggle != null) headerStarlightToggle.Enabled = !busy && store != null;
+        if (starlightToggle != null) starlightToggle.Enabled = !busy && store != null;
         return;
       }
       titleLabel.Text = skin.Manifest.name;
@@ -548,22 +565,21 @@ namespace CodexDreamSkinManager
 
     private void SyncStarlightToggle()
     {
-      if (headerStarlightToggle == null || store == null) return;
+      if (starlightToggle == null || store == null) return;
       updatingStarlightToggle = true;
       try
       {
         bool enabled = store.GetStarlightEnabled();
-        SetStarlightToggleState(headerStarlightToggle, enabled, !busy);
+        starlightToggle.Checked = enabled;
+        starlightToggle.Text = enabled ? "开" : "关";
+        if (starlightStatusLabel != null)
+        {
+          starlightStatusLabel.Text = enabled ? "星光已开启" : "星光已关闭";
+          starlightStatusLabel.ForeColor = enabled ? Teal : Muted;
+        }
+        starlightToggle.Enabled = !busy;
       }
       finally { updatingStarlightToggle = false; }
-    }
-
-    private void SetStarlightToggleState(DreamToggle toggle, bool enabled, bool controlEnabled)
-    {
-      if (toggle == null) return;
-      toggle.Checked = enabled;
-      toggle.Text = enabled ? "开" : "关";
-      toggle.Enabled = controlEnabled;
     }
 
     private void OnStarlightToggleChanged(object sender, EventArgs args)
@@ -571,16 +587,29 @@ namespace CodexDreamSkinManager
       if (updatingStarlightToggle || store == null) return;
       try
       {
-        DreamToggle source = sender as DreamToggle;
-        bool enabled = source == null ? store.GetStarlightEnabled() : source.Checked;
-        store.SetStarlightEnabled(enabled);
-        updatingStarlightToggle = true;
-        try
+        bool enabled = starlightToggle.Checked;
+        starlightToggle.Text = enabled ? "开" : "关";
+        if (starlightStatusLabel != null)
         {
-          SetStarlightToggleState(headerStarlightToggle, enabled, !busy);
+          starlightStatusLabel.Text = enabled ? "星光已开启" : "星光已关闭";
+          starlightStatusLabel.ForeColor = enabled ? Teal : Muted;
         }
-        finally { updatingStarlightToggle = false; }
-        SetStatus("已" + (enabled ? "开启" : "关闭") + "星光动态特效。点击“应用并启动”后生效。");
+        store.SetStarlightEnabled(enabled);
+        CodexClientStatus codexStatus = RefreshCodexStatusIndicator();
+        if (!codexStatus.IsRunning)
+        {
+          SetStatus("已" + (enabled ? "开启" : "关闭") + "动态特效，下次启动 Codex 时生效。");
+          return;
+        }
+        RunEngineAction("正在" + (enabled ? "开启" : "关闭") + "动态特效...",
+          delegate { return runner.ApplySelectedSkin(false); },
+          delegate(RunResult result)
+          {
+            if (result.ExitCode == 0)
+              SetStatus("动态特效已" + (enabled ? "开启" : "关闭") + "，当前 Codex 已更新。");
+            else
+              SetStatus("动态特效设置已保存；重新应用皮肤或重启 Codex 后生效。");
+          });
       }
       catch (Exception error)
       {
@@ -627,8 +656,9 @@ namespace CodexDreamSkinManager
         }
         catch (IOException error)
         {
-          DialogResult answer = DreamMessageDialog.Show(this, error.Message + Environment.NewLine + "是否替换现有皮肤？",
-            "皮肤已存在", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2);
+          DialogResult answer = DreamDialog.Confirm(this, "皮肤已存在",
+            error.Message + Environment.NewLine + "替换后将使用新皮肤包中的内容。",
+            "替换皮肤", "保留现有", DreamDialogTone.Question, false, false);
           overwrite = answer == DialogResult.Yes;
           if (!overwrite) return;
         }
@@ -645,11 +675,11 @@ namespace CodexDreamSkinManager
       if (skin == null || busy) return;
       CodexClientStatus codexStatus = RefreshCodexStatusIndicator();
       string confirmation = CodexClientMessages.Apply(skin.Manifest.name, codexStatus.IsRunning);
-      DialogResult confirmationResult = DreamMessageDialog.Show(this, confirmation,
-        CodexClientMessages.Title(codexStatus.IsRunning),
-        MessageBoxButtons.YesNo,
-        codexStatus.IsRunning ? MessageBoxIcon.Warning : MessageBoxIcon.Information,
-        MessageBoxDefaultButton.Button2);
+      DialogResult confirmationResult = DreamDialog.Confirm(this,
+        CodexClientMessages.Title(codexStatus.IsRunning), confirmation,
+        "应用皮肤", "暂不应用",
+        codexStatus.IsRunning ? DreamDialogTone.Warning : DreamDialogTone.Information,
+        false, !codexStatus.IsRunning);
       if (confirmationResult != DialogResult.Yes)
       {
         SetStatus("已取消应用皮肤。");
@@ -721,8 +751,9 @@ namespace CodexDreamSkinManager
     {
       SkinRecord skin = SelectedSkin;
       if (skin == null || busy) return;
-      DialogResult answer = DreamMessageDialog.Show(this, "确定删除皮肤“" + skin.Manifest.name + "”吗？",
-        "删除皮肤", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+      DialogResult answer = DreamDialog.Confirm(this, "删除皮肤",
+        "确定删除“" + skin.Manifest.name + "”吗？此操作不会影响其他皮肤。",
+        "删除", "取消", DreamDialogTone.Danger, true, false);
       if (answer != DialogResult.Yes) return;
       try
       {
@@ -738,11 +769,11 @@ namespace CodexDreamSkinManager
       if (busy) return;
       CodexClientStatus codexStatus = RefreshCodexStatusIndicator();
       string confirmation = CodexClientMessages.Restore(codexStatus.IsRunning);
-      DialogResult answer = DreamMessageDialog.Show(this, confirmation,
-        CodexClientMessages.Title(codexStatus.IsRunning),
-        MessageBoxButtons.YesNo,
-        codexStatus.IsRunning ? MessageBoxIcon.Warning : MessageBoxIcon.Information,
-        MessageBoxDefaultButton.Button2);
+      DialogResult answer = DreamDialog.Confirm(this,
+        CodexClientMessages.Title(codexStatus.IsRunning), confirmation,
+        "恢复官方外观", "取消",
+        codexStatus.IsRunning ? DreamDialogTone.Warning : DreamDialogTone.Information,
+        false, false);
       if (answer != DialogResult.Yes) return;
       RunEngineAction("正在恢复官方外观...", delegate { return runner.RestoreOfficialAppearance(codexStatus.IsRunning); },
         delegate(RunResult result)
@@ -787,7 +818,7 @@ namespace CodexDreamSkinManager
       deleteButton.Enabled = enabled && SelectedSkin != null && !SelectedSkin.IsBuiltIn && !SelectedSkin.IsActive;
       restoreButton.Enabled = enabled;
       skinList.Enabled = enabled;
-      if (headerStarlightToggle != null) headerStarlightToggle.Enabled = enabled && store != null;
+      if (starlightToggle != null) starlightToggle.Enabled = enabled && store != null;
     }
 
     private void SetActionAvailability(bool selected)
@@ -798,7 +829,7 @@ namespace CodexDreamSkinManager
       folderButton.Enabled = selected && !busy;
       deleteButton.Enabled = selected && !busy;
       restoreButton.Enabled = !busy && runner != null;
-      if (headerStarlightToggle != null) headerStarlightToggle.Enabled = !busy && store != null;
+      if (starlightToggle != null) starlightToggle.Enabled = !busy && store != null;
     }
 
     private void SetStatus(string value)
@@ -809,8 +840,7 @@ namespace CodexDreamSkinManager
     private void ShowError(string title, Exception error)
     {
       SetStatus(title + "：" + error.Message);
-      DreamMessageDialog.Show(this, error.Message, title, MessageBoxButtons.OK, MessageBoxIcon.Error,
-        MessageBoxDefaultButton.Button1);
+      DreamDialog.ShowMessage(this, title, error.Message, DreamDialogTone.Danger);
     }
 
     private static string ResultMessage(RunResult result)
@@ -850,11 +880,7 @@ namespace CodexDreamSkinManager
 
     private void OnShown(object sender, EventArgs args)
     {
-      if (mainSplit != null)
-      {
-        int preferred = Math.Min(310, Math.Max(270, ClientSize.Width / 3));
-        if (mainSplit.Width > preferred + 500) mainSplit.SplitterDistance = preferred;
-      }
+      AdjustSplitForWindow(true);
       if (string.IsNullOrEmpty(screenshotPath)) return;
       var timer = new Timer { Interval = 900 };
       timer.Tick += delegate
@@ -870,6 +896,16 @@ namespace CodexDreamSkinManager
         Close();
       };
       timer.Start();
+    }
+
+    private void AdjustSplitForWindow(bool initialize)
+    {
+      if (mainSplit == null || mainSplit.Width <= 0) return;
+      int preferred = ClientSize.Width < 1080
+        ? 270
+        : Math.Min(310, Math.Max(270, ClientSize.Width / 3));
+      if (mainSplit.Width > preferred + 500 && (initialize || ClientSize.Width < 1080))
+        mainSplit.SplitterDistance = preferred;
     }
 
     protected override void Dispose(bool disposing)
@@ -1097,266 +1133,6 @@ namespace CodexDreamSkinManager
       using (var brush = new SolidBrush(fillColor)) args.Graphics.FillPath(brush, path);
       TextRenderer.DrawText(args.Graphics, Text, Font, bounds, textColor,
         TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
-    }
-  }
-
-  internal sealed class DreamMessageDialog : Form
-  {
-    private static readonly Color Canvas = Color.FromArgb(247, 244, 239);
-    private static readonly Color Surface = Color.FromArgb(255, 253, 249);
-    private static readonly Color Ink = Color.FromArgb(60, 45, 48);
-    private static readonly Color Muted = Color.FromArgb(113, 94, 97);
-    private static readonly Color Border = Color.FromArgb(226, 213, 205);
-    private static readonly Color Coral = Color.FromArgb(206, 103, 82);
-    private static readonly Color Teal = Color.FromArgb(61, 132, 137);
-    private static readonly Color Violet = Color.FromArgb(137, 95, 174);
-    private static readonly Color Danger = Color.FromArgb(176, 61, 61);
-
-    public static DialogResult Show(IWin32Window owner, string message, string title,
-      MessageBoxButtons buttons, MessageBoxIcon icon, MessageBoxDefaultButton defaultButton)
-    {
-      using (DreamMessageDialog dialog = new DreamMessageDialog(title, message, buttons, icon, defaultButton))
-      {
-        return owner == null ? dialog.ShowDialog() : dialog.ShowDialog(owner);
-      }
-    }
-
-    private DreamMessageDialog(string title, string message, MessageBoxButtons buttons, MessageBoxIcon icon,
-      MessageBoxDefaultButton defaultButton)
-    {
-      Text = title;
-      try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
-      Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Regular, GraphicsUnit.Point);
-      StartPosition = FormStartPosition.CenterParent;
-      FormBorderStyle = FormBorderStyle.None;
-      ShowInTaskbar = false;
-      MaximizeBox = false;
-      MinimizeBox = false;
-      BackColor = Canvas;
-      AutoScaleMode = AutoScaleMode.Dpi;
-      Padding = new Padding(1);
-      int bodyHeight = Math.Max(82, Math.Min(190, TextRenderer.MeasureText(message, Font, new Size(396, 0),
-        TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl).Height + 8));
-      ClientSize = new Size(556, bodyHeight + 184);
-      Region = new Region(UiGeometry.Rounded(new Rectangle(0, 0, ClientSize.Width, ClientSize.Height), 22));
-
-      DreamDialogBackdrop backdrop = new DreamDialogBackdrop { Dock = DockStyle.Fill };
-      Controls.Add(backdrop);
-      RoundedPanel card = new RoundedPanel
-      {
-        Location = new Point(20, 20),
-        Size = new Size(ClientSize.Width - 36, ClientSize.Height - 36),
-        Radius = 28,
-        BackColor = Surface,
-        BorderColor = Border
-      };
-      backdrop.Controls.Add(card);
-
-      DreamDialogCloseButton closeButton = new DreamDialogCloseButton
-      {
-        Location = new Point(card.Width - 47, 16),
-        Size = new Size(30, 30),
-        AccessibleName = "关闭弹窗"
-      };
-      closeButton.Click += delegate { DialogResult = DialogResult.Cancel; Close(); };
-      card.Controls.Add(closeButton);
-
-      DreamMessageGlyph glyph = new DreamMessageGlyph(icon) { Location = new Point(26, 27), Size = new Size(60, 60) };
-      Label titleLabel = new Label
-      {
-        AutoSize = false,
-        Text = title,
-        Font = new Font("Microsoft YaHei UI", 15F, FontStyle.Bold),
-        ForeColor = Ink,
-        BackColor = Color.Transparent,
-        Location = new Point(100, 29),
-        Size = new Size(356, 32)
-      };
-      Label body = new Label
-      {
-        AutoSize = false,
-        Text = message,
-        Font = new Font("Microsoft YaHei UI", 9.4F),
-        ForeColor = Muted,
-        BackColor = Color.Transparent,
-        Location = new Point(102, 69),
-        Size = new Size(382, bodyHeight)
-      };
-      card.Controls.Add(glyph);
-      card.Controls.Add(titleLabel);
-      card.Controls.Add(body);
-      AddButtons(card, buttons, defaultButton, bodyHeight + 98);
-    }
-
-    private void AddButtons(Control card, MessageBoxButtons buttons, MessageBoxDefaultButton defaultButton, int top)
-    {
-      if (buttons == MessageBoxButtons.YesNo)
-      {
-        DreamButton yes = CreateDialogButton("继续", DialogResult.Yes, true, false, new Point(card.Width - 214, top));
-        DreamButton no = CreateDialogButton("取消", DialogResult.No, false, false, new Point(card.Width - 114, top));
-        card.Controls.Add(yes);
-        card.Controls.Add(no);
-        AcceptButton = defaultButton == MessageBoxDefaultButton.Button2 ? no : yes;
-        CancelButton = no;
-        return;
-      }
-      DreamButton ok = CreateDialogButton("知道了", DialogResult.OK, true, false, new Point(card.Width - 114, top));
-      card.Controls.Add(ok);
-      AcceptButton = ok;
-      CancelButton = ok;
-    }
-
-    private DreamButton CreateDialogButton(string text, DialogResult result, bool primary, bool danger, Point location)
-    {
-      return new DreamButton
-      {
-        Text = text,
-        DialogResult = result,
-        Primary = primary,
-        Danger = danger,
-        Size = new Size(88, 40),
-        Location = location,
-        Font = new Font("Microsoft YaHei UI", 9.4F, FontStyle.Bold),
-        Cursor = Cursors.Hand,
-        AccessibleName = text
-      };
-    }
-
-    private sealed class DreamDialogBackdrop : Panel
-    {
-      public DreamDialogBackdrop()
-      {
-        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
-      }
-
-      protected override void OnPaintBackground(PaintEventArgs args)
-      {
-        args.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        using (var gradient = new LinearGradientBrush(ClientRectangle,
-          Color.FromArgb(255, 249, 244), Color.FromArgb(237, 246, 244), LinearGradientMode.Horizontal))
-        {
-          args.Graphics.FillRectangle(gradient, ClientRectangle);
-        }
-        using (var warm = new SolidBrush(Color.FromArgb(54, Coral))) args.Graphics.FillEllipse(warm, Width - 280, -110, 300, 230);
-        using (var cool = new SolidBrush(Color.FromArgb(38, Teal))) args.Graphics.FillEllipse(cool, Width - 120, 40, 190, 160);
-      }
-
-      protected override void OnPaint(PaintEventArgs args)
-      {
-        base.OnPaint(args);
-        args.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        Rectangle bounds = new Rectangle(0, 0, Width - 1, Height - 1);
-        using (GraphicsPath path = UiGeometry.Rounded(bounds, 22))
-        using (var pen = new Pen(Color.FromArgb(232, 202, 191), 1.4F))
-          args.Graphics.DrawPath(pen, path);
-      }
-    }
-
-    private sealed class DreamDialogCloseButton : Control
-    {
-      private bool hovered;
-      private bool pressed;
-
-      public DreamDialogCloseButton()
-      {
-        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
-          ControlStyles.UserPaint | ControlStyles.SupportsTransparentBackColor, true);
-        BackColor = Color.Transparent;
-        Cursor = Cursors.Hand;
-      }
-
-      protected override void OnMouseEnter(EventArgs eventArgs) { hovered = true; Invalidate(); base.OnMouseEnter(eventArgs); }
-      protected override void OnMouseLeave(EventArgs eventArgs) { hovered = false; pressed = false; Invalidate(); base.OnMouseLeave(eventArgs); }
-      protected override void OnMouseDown(MouseEventArgs eventArgs) { pressed = true; Invalidate(); base.OnMouseDown(eventArgs); }
-      protected override void OnMouseUp(MouseEventArgs eventArgs) { pressed = false; Invalidate(); base.OnMouseUp(eventArgs); }
-
-      protected override void OnPaintBackground(PaintEventArgs args)
-      {
-        int offsetX;
-        int offsetY;
-        Control ancestor = UiGeometry.BackgroundAncestor(this, out offsetX, out offsetY);
-        if (ancestor == null)
-        {
-          args.Graphics.Clear(Canvas);
-          return;
-        }
-        GraphicsState state = args.Graphics.Save();
-        try
-        {
-          args.Graphics.TranslateTransform(-offsetX, -offsetY);
-          using (var parentArgs = new PaintEventArgs(args.Graphics, new Rectangle(offsetX, offsetY, Width, Height)))
-            InvokePaintBackground(ancestor, parentArgs);
-        }
-        finally { args.Graphics.Restore(state); }
-      }
-
-      protected override void OnPaint(PaintEventArgs args)
-      {
-        OnPaintBackground(args);
-        args.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        Color fill = pressed ? Color.FromArgb(242, 221, 214) : hovered ? Color.FromArgb(249, 235, 229) : Color.FromArgb(0, 255, 255, 255);
-        if (fill.A > 0)
-        {
-          using (GraphicsPath path = UiGeometry.Rounded(new Rectangle(1, 1, Width - 3, Height - 3), 10))
-          using (var brush = new SolidBrush(fill)) args.Graphics.FillPath(brush, path);
-        }
-        using (var pen = new Pen(hovered ? Coral : Muted, 1.8F))
-        {
-          args.Graphics.DrawLine(pen, 10, 10, Width - 10, Height - 10);
-          args.Graphics.DrawLine(pen, Width - 10, 10, 10, Height - 10);
-        }
-      }
-    }
-
-    private sealed class DreamMessageGlyph : Control
-    {
-      private readonly MessageBoxIcon icon;
-
-      public DreamMessageGlyph(MessageBoxIcon icon)
-      {
-        this.icon = icon;
-        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
-          ControlStyles.UserPaint | ControlStyles.SupportsTransparentBackColor, true);
-        BackColor = Color.Transparent;
-      }
-
-      protected override void OnPaintBackground(PaintEventArgs args)
-      {
-        int offsetX;
-        int offsetY;
-        Control ancestor = UiGeometry.BackgroundAncestor(this, out offsetX, out offsetY);
-        if (ancestor == null)
-        {
-          args.Graphics.Clear(Canvas);
-          return;
-        }
-        GraphicsState state = args.Graphics.Save();
-        try
-        {
-          args.Graphics.TranslateTransform(-offsetX, -offsetY);
-          using (var parentArgs = new PaintEventArgs(args.Graphics, new Rectangle(offsetX, offsetY, Width, Height)))
-            InvokePaintBackground(ancestor, parentArgs);
-        }
-        finally { args.Graphics.Restore(state); }
-      }
-
-      protected override void OnPaint(PaintEventArgs args)
-      {
-        OnPaintBackground(args);
-        args.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        Color accent = Teal;
-        string symbol = "✓";
-        if (icon == MessageBoxIcon.Error) { accent = Danger; symbol = "×"; }
-        else if (icon == MessageBoxIcon.Warning) { accent = Coral; symbol = "!"; }
-        else if (icon == MessageBoxIcon.Question) { accent = Violet; symbol = "?"; }
-        using (var brush = new SolidBrush(Color.FromArgb(38, accent))) args.Graphics.FillEllipse(brush, 1, 1, Width - 3, Height - 3);
-        using (var pen = new Pen(Color.FromArgb(140, accent), 1.2F)) args.Graphics.DrawEllipse(pen, 1, 1, Width - 3, Height - 3);
-        using (var font = new Font("Microsoft YaHei UI", 21F, FontStyle.Bold))
-        {
-          TextRenderer.DrawText(args.Graphics, symbol, font, new Rectangle(0, 0, Width, Height), accent,
-            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-        }
-      }
     }
   }
 
@@ -1708,7 +1484,19 @@ namespace CodexDreamSkinManager
       if (thumbnails.TryGetValue(path, out cached)) return cached;
       try
       {
-        using (Image source = Image.FromFile(path)) cached = new Bitmap(source);
+        using (Image source = Image.FromFile(path))
+        {
+          var thumbnail = new Bitmap(116, 116, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+          using (Graphics graphics = Graphics.FromImage(thumbnail))
+          {
+            graphics.CompositingMode = CompositingMode.SourceCopy;
+            graphics.CompositingQuality = CompositingQuality.HighQuality;
+            graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            DrawCover(graphics, source, new Rectangle(0, 0, thumbnail.Width, thumbnail.Height));
+          }
+          cached = thumbnail;
+        }
         thumbnails[path] = cached;
         return cached;
       }
@@ -1738,4 +1526,3 @@ namespace CodexDreamSkinManager
     }
   }
 }
-

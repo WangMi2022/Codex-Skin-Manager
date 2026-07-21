@@ -384,12 +384,20 @@ try {
   }
   foreach ($shellMarker in @(
     'dream-windows-menu-bar',
+    'data-dream-menu-command-group',
+    '--dream-windows-menu-inline-padding',
+    '--dream-windows-menu-command-offset',
     'dream-shell-attached-main',
     'dream-shell-attached-sidebar',
     'integrateWindowsShell'
   )) {
     if (-not $rendererPayload.Contains($shellMarker)) {
       throw "Connected Windows shell compatibility is missing marker: $shellMarker"
+    }
+  }
+  foreach ($activityMarker in @('[class~="animate-spin"]:has(> svg[class~="icon-xs"])', 'width: 12px !important;', 'opacity: .16 !important;')) {
+    if (-not $rendererPayload.Contains($activityMarker)) {
+      throw "Schema v1 sidebar activity styling is missing marker: $activityMarker"
     }
   }
   $injectorSource = Get-Content -Raw -LiteralPath (Join-Path $Root 'scripts\injector.mjs')
@@ -399,9 +407,21 @@ try {
     }
   }
   $themeV2Runtime = Get-Content -Raw -LiteralPath (Join-Path $Root 'scripts\theme-v2\runtime\theme-runtime.js')
-  foreach ($shellMarker in @('cts-shell-attached-main', 'cts-shell-attached-sidebar', 'integrateShellSeam')) {
+  foreach ($shellMarker in @(
+    'cts-shell-attached-main', 'cts-shell-attached-sidebar', 'integrateShellSeam',
+    'data-cts-menu-command-group', '--cts-windows-menu-inline-padding', '--cts-windows-menu-command-offset'
+  )) {
     if (-not $themeV2Runtime.Contains($shellMarker)) {
       throw "Theme v2 connected-shell compatibility is missing marker: $shellMarker"
+    }
+  }
+  if (-not $injectorSource.Contains('windowsMenuSeamPass') -or -not $themeV2Runtime.Contains('WINDOWS_MENU_COMMAND_GROUP_ATTR') -or
+    -not $themeV2Runtime.Contains('availablePadding') -or -not (Get-Content -Raw -LiteralPath (Join-Path $Root 'scripts\theme-v2\payload.mjs')).Contains('windowsMenuSeamPass')) {
+    throw 'Responsive Windows menu seam verification is incomplete.'
+  }
+  foreach ($activityMarker in @('[class~="animate-spin"]:has(> svg[class~="icon-xs"])', 'width: 12px !important;', 'opacity: .16 !important;')) {
+    if (-not $themeV2Runtime.Contains($activityMarker)) {
+      throw "Schema v2 sidebar activity styling is missing marker: $activityMarker"
     }
   }
   $violetCssPath = Join-Path $Root 'assets\dream-skin.css'
@@ -506,7 +526,7 @@ try {
   Write-DreamSkinUtf8FileAtomically -Path (Join-Path $awesomeThemeRoot 'chrome.html') -Content `
     '<div data-cts-layer="stage"><i data-cts-text="hero-title"></i></div>'
   Write-DreamSkinUtf8FileAtomically -Path (Join-Path $awesomeStateRoot 'active-skin.json') -Content `
-    '{"schemaVersion":1,"skinId":"awesome-v2-test"}'
+    '{"schemaVersion":1,"skinId":"awesome-v2-test","starlightEnabled":false}'
   $savedAwesomeStateRoot = $env:CODEX_DREAM_SKIN_STATE_ROOT
   try {
     $env:CODEX_DREAM_SKIN_STATE_ROOT = $awesomeStateRoot
@@ -516,6 +536,9 @@ try {
     if (-not $awesomePayload.pass -or $awesomePayload.skinId -cne 'awesome-v2-test' -or
       $awesomePayload.format -cne 'awesome-v2') {
       throw 'Injector did not select the awesome schema v2 runtime.'
+    }
+    if ($awesomePayload.starlightEnabled -ne $false) {
+      throw 'Awesome schema v2 payload did not preserve the disabled starlight preference.'
     }
     Write-DreamSkinUtf8FileAtomically -Path (Join-Path $awesomeThemeRoot 'theme.css') -Content `
       '@import url("https://example.com/unsafe-v2.css");'
