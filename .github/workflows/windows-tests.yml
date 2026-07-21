@@ -16,7 +16,7 @@ jobs:
       - name: Run Windows regression tests
         shell: pwsh
         run: |
-          $output = @(& .\windows\tests\run-tests.ps1 2>&1)
+          $output = @(& pwsh -NoProfile -File .\windows\tests\run-tests.ps1 2>&1)
           $exitCode = $LASTEXITCODE
           $output | ForEach-Object { Write-Host $_ }
           if ($exitCode -ne 0) {
