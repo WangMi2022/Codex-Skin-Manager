@@ -7,6 +7,24 @@
 
 当前版本：**2.5.4**
 
+## 界面预览
+
+### 皮肤管理器
+
+<p align="center">
+  <img src="docs/images/codex-skin-manager-v2.5.4.png" alt="Codex 皮肤主题管理器 v2.5.4 界面" width="100%">
+</p>
+
+<p align="center"><sub>集中预览、切换和管理内置及导入的 Codex 皮肤</sub></p>
+
+### 皮肤应用效果
+
+<p align="center">
+  <img src="docs/images/codex-skin-rose-theme-preview.png" alt="Codex 粉色人物皮肤应用效果" width="100%">
+</p>
+
+<p align="center"><sub>皮肤应用后的 Codex 主界面效果，支持动态星光与舞台动画</sub></p>
+
 ## 功能
 
 - 中文 WinForms 管理界面
