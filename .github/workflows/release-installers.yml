@@ -1,0 +1,93 @@
+name: Release installers
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Build Windows installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and verify Windows installer
+        shell: pwsh
+        run: .\windows\scripts\build-installer.ps1 -Version '2.5.4'
+
+      - name: Upload Windows release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            release/Codex-Dream-Skin-Setup-Windows-x64-v2.5.4.exe
+            release/Codex-Dream-Skin-Setup-Windows-x64-v2.5.4.exe.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  macos:
+    name: Build macOS installer
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and verify macOS installer
+        shell: bash
+        run: |
+          output="$RUNNER_TEMP/Codex-Dream-Skin-Setup-macOS-v1.1.2.zip"
+          ./macos/scripts/build-client-release.sh "$output"
+          hash="$(/usr/bin/shasum -a 256 "$output" | /usr/bin/awk '{print $1}')"
+          /usr/bin/printf '%s  %s\n' "$hash" "$(/usr/bin/basename "$output")" > "$output.sha256"
+
+      - name: Upload macOS release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-installer
+          path: |
+            ${{ runner.temp }}/Codex-Dream-Skin-Setup-macOS-v1.1.2.zip
+            ${{ runner.temp }}/Codex-Dream-Skin-Setup-macOS-v1.1.2.zip.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish GitHub Release
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download verified installers
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Verify release asset set
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f release-assets/Codex-Dream-Skin-Setup-Windows-x64-v2.5.4.exe
+          test -f release-assets/Codex-Dream-Skin-Setup-Windows-x64-v2.5.4.exe.sha256
+          test -f release-assets/Codex-Dream-Skin-Setup-macOS-v1.1.2.zip
+          test -f release-assets/Codex-Dream-Skin-Setup-macOS-v1.1.2.zip.sha256
+
+      - name: Create GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="$RUNNER_TEMP/release-notes.md"
+          /usr/bin/printf '%s\n' \
+            '## 安装包' \
+            '' \
+            '- Windows x64：Codex 皮肤主题管理器 v2.5.4，图形化安装程序，默认安装父目录为 E:\。' \
+            '- macOS：Codex Dream Skin Studio v1.1.2，解压后双击“安装 Codex 主题编辑器.command”。' \
+            '' \
+            '两个平台均附带 SHA-256 校验文件。' \
+            > "$notes"
+          gh release create "$GITHUB_REF_NAME" release-assets/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title 'Codex Skin Manager v2.5.4 / macOS Studio v1.1.2' \
+            --notes-file "$notes"
